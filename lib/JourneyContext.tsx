@@ -23,6 +23,7 @@ import {
 } from './permissions';
 import { saveUnityRough } from './supabase';
 import { useHoldMusic } from './useHoldMusic';
+import { useAgentCall, type AgentCall } from './useAgentCall';
 
 interface PermPopup {
   open: boolean;
@@ -42,6 +43,10 @@ interface JourneyValue {
 
   camera: CameraState;
   holdMusic: ReturnType<typeof useHoldMusic>;
+  /** Live WebRTC call with the agent console (falls back to the demo call). */
+  call: AgentCall;
+  /** Join the agent queue from the waiting screen; resolves with agents online. */
+  ringAgent: () => Promise<number>;
 
   // Onboarding (permissions) sequence
   permPopup: PermPopup;
@@ -91,6 +96,7 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
 
   // Collected across the permission steps; read when we persist to Supabase.
   const permResultsRef = useRef<PermResults>(emptyPermResults());
+  const restartRef = useRef<() => void>(() => {});
   const sessionIdRef = useRef<string>('');
   if (!sessionIdRef.current) sessionIdRef.current = newSessionId();
 
@@ -118,6 +124,23 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
       setScreen(next);
     },
     [clearObTimers]
+  );
+
+  const call = useAgentCall({
+    onAccept: () => go('connecting'),
+    onCode: () => go('readCode'),
+    onHangup: () => restartRef.current(),
+  });
+
+  const ringAgent = useCallback(
+    () =>
+      call.ring(streamRef.current, {
+        selfie: selfieUrl,
+        pan: panFrontUrl,
+        latitude: permResultsRef.current.latitude,
+        longitude: permResultsRef.current.longitude,
+      }),
+    [call, selfieUrl, panFrontUrl]
   );
 
   const advanceOnboard = useCallback(() => {
@@ -242,6 +265,7 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
       window.speechSynthesis.cancel();
     }
     holdMusic.stopHold();
+    call.hangup();
     clearObTimers();
     stopStream();
     setCamFailed(false);
@@ -252,7 +276,8 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
     setSelfieUrl(null);
     setPanFrontUrl(null);
     setScreen('redirect');
-  }, [holdMusic, clearObTimers, stopStream]);
+  }, [holdMusic, call, clearObTimers, stopStream]);
+  restartRef.current = restart;
 
   const value = useMemo<JourneyValue>(
     () => ({
@@ -261,6 +286,8 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
       restart,
       camera: { stream, failed: camFailed },
       holdMusic,
+      call,
+      ringAgent,
       permPopup,
       permInfo: PERM_INFO,
       startOnboarding,
@@ -278,6 +305,8 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
       stream,
       camFailed,
       holdMusic,
+      call,
+      ringAgent,
       permPopup,
       startOnboarding,
       obProceed,

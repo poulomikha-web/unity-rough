@@ -91,3 +91,20 @@ export function CamVideo({
     <video id={id} className={className} style={style} autoPlay playsInline muted ref={ref} />
   );
 }
+
+/**
+ * A <video> showing the agent's live stream during a real call. Not muted —
+ * this element is what plays the agent's voice.
+ */
+export function RemoteVideo({ id, className }: { id?: string; className?: string }) {
+  const ref = useRef<HTMLVideoElement>(null);
+  const { call } = useJourney();
+
+  useEffect(() => {
+    const v = ref.current;
+    attachStream(v, call.remoteStream);
+    v?.play().catch(() => {});
+  }, [call.remoteStream]);
+
+  return <video id={id} className={className} autoPlay playsInline ref={ref} style={{ transform: 'none' }} />;
+}

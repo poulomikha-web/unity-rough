@@ -3,7 +3,7 @@
 import { useEffect, useMemo } from 'react';
 import { useJourney } from '@/lib/JourneyContext';
 import { TIMING } from '@/lib/journey';
-import { CamVideo, SecuredFooter } from '@/components/shared';
+import { CamVideo, RemoteVideo, SecuredFooter } from '@/components/shared';
 
 const HangupIcon = (
   <svg viewBox="0 0 24 24">
@@ -19,15 +19,28 @@ const AudioBars = ({ size }: { size: 'big' | 'small' }) => (
   </div>
 );
 
-/** SS3 — Agent video call. Jumps to the read-the-code step after 3 minutes
- *  (or immediately when "c" is pressed, a demo shortcut from the prototype). */
+const offStyle = (on: boolean) => (on ? undefined : { opacity: 0.45 });
+
+/** Upload/download kbps for the top bar: real getStats() numbers in a live call. */
+function useKbps(fallback: { up: number; down: number }) {
+  const { call } = useJourney();
+  return call.mode === 'live' && call.bitrate ? call.bitrate : fallback;
+}
+
+/** SS3 — Agent video call.
+ *  Live call: the main tile is the agent's WebRTC stream, and the agent's
+ *  "Generate code" moves us to the read-the-code step.
+ *  Demo call: jumps to read-the-code after 3 minutes (or when "c" is pressed). */
 export function VideoCallScreen() {
-  const { go, restart, holdMusic } = useJourney();
+  const { go, restart, holdMusic, call } = useJourney();
+  const live = call.mode === 'live';
+  const kbps = useKbps({ up: 214, down: 145 });
 
   useEffect(() => {
     // Entering the call: stop hold music, play the connect chime.
     holdMusic.stopHold();
     holdMusic.chime();
+    if (live) return;
 
     const t = setTimeout(() => go('readCode'), TIMING.codeStepDelay);
     const onKey = (e: KeyboardEvent) => {
@@ -54,20 +67,20 @@ export function VideoCallScreen() {
           <svg viewBox="0 0 24 24">
             <path d="M4 12l1.41 1.41L11 7.83V20h2V7.83l5.58 5.59L20 12l-8-8-8 8z" />
           </svg>
-          214 kbps
+          {kbps.up} kbps
         </span>
         <span className="call-kbps">
           <svg viewBox="0 0 24 24">
             <path d="M20 12l-1.41-1.41L13 16.17V4h-2v12.17l-5.58-5.59L4 12l8 8 8-8z" />
           </svg>
-          145 kbps
+          {kbps.down} kbps
         </span>
         <svg className="call-fs" viewBox="0 0 24 24">
           <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z" />
         </svg>
       </div>
       <div className="call-main">
-        <CamVideo id="callMainVideo" />
+        {live ? <RemoteVideo id="callMainVideo" /> : <CamVideo id="callMainVideo" />}
         <AudioBars size="big" />
         <div className="call-pip">
           <CamVideo id="callPipVideo" />
@@ -94,12 +107,22 @@ export function VideoCallScreen() {
             <path d="M20 4h-3.17L15 2H9L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm-8 3c1.63 0 3.06.79 3.98 2H14v2h5V6h-2v1.14C15.76 5.83 13.98 5 12 5c-2.8 0-5.19 1.66-6.3 4.03l1.84.55C8.35 8.06 10.03 7 12 7zm0 10c-1.63 0-3.06-.79-3.98-2H10v-2H5v5h2v-1.14C8.24 18.17 10.02 19 12 19c2.8 0 5.19-1.66 6.3-4.03l-1.84-.55C15.65 15.94 13.97 17 12 17z" />
           </svg>
         </button>
-        <button className="call-ctrl">
+        <button
+          className="call-ctrl"
+          onClick={live ? call.toggleMic : undefined}
+          aria-pressed={call.micOn}
+          style={offStyle(!live || call.micOn)}
+        >
           <svg viewBox="0 0 24 24">
             <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5-3c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
           </svg>
         </button>
-        <button className="call-ctrl">
+        <button
+          className="call-ctrl"
+          onClick={live ? call.toggleCam : undefined}
+          aria-pressed={call.camOn}
+          style={offStyle(!live || call.camOn)}
+        >
           <svg viewBox="0 0 24 24">
             <path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z" />
           </svg>
@@ -119,7 +142,11 @@ export function VideoCallScreen() {
 
 /** SS4 — Read-the-code: agent asks the customer to read a 4-digit code aloud. */
 export function ReadCodeScreen() {
-  const { restart } = useJourney();
+  const { restart, call } = useJourney();
+  const live = call.mode === 'live';
+  const kbps = useKbps({ up: 118, down: 0 });
+  // The live code comes from the agent console's "Generate code".
+  const digits = (call.code ?? '9141').split('').join('-');
 
   const stamp = useMemo(() => {
     const now = new Date();
@@ -143,24 +170,24 @@ export function ReadCodeScreen() {
           <svg viewBox="0 0 24 24">
             <path d="M4 12l1.41 1.41L11 7.83V20h2V7.83l5.58 5.59L20 12l-8-8-8 8z" />
           </svg>
-          118 kbps
+          {kbps.up} kbps
         </span>
         <span className="call-kbps down">
           <svg viewBox="0 0 24 24">
             <path d="M20 12l-1.41-1.41L13 16.17V4h-2v12.17l-5.58-5.59L4 12l8 8 8-8z" />
           </svg>
-          0 kbps
+          {kbps.down} kbps
         </span>
         <svg className="call-fs" viewBox="0 0 24 24">
           <path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z" />
         </svg>
       </div>
       <div className="code-stage">
-        <CamVideo id="codeMainVideo" />
+        {live ? <RemoteVideo id="codeMainVideo" /> : <CamVideo id="codeMainVideo" />}
         <AudioBars size="big" />
         <div className="code-panel">
           <div className="code-digits" id="codeDigits">
-            9-1-4-1
+            {digits}
           </div>
           <div className="code-hint">Read these digits aloud</div>
         </div>
@@ -176,7 +203,12 @@ export function ReadCodeScreen() {
             <path d="M12 4V1L8 5l4 4V6c2.21 0 4 1.79 4 4 0 .68-.17 1.32-.47 1.88l1.46 1.46A5.94 5.94 0 0018 10c0-3.31-2.69-6-6-6zm0 12c-2.21 0-4-1.79-4-4 0-.68.17-1.32.47-1.88L7.01 8.66A5.94 5.94 0 006 12c0 3.31 2.69 6 6 6v3l4-4-4-4v3z" />
           </svg>
         </button>
-        <button className="call-ctrl">
+        <button
+          className="call-ctrl"
+          onClick={live ? call.toggleMic : undefined}
+          aria-pressed={call.micOn}
+          style={offStyle(!live || call.micOn)}
+        >
           <svg viewBox="0 0 24 24">
             <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5-3c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
           </svg>

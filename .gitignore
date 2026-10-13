@@ -25,3 +25,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# generated from .env.local by scripts/gen-svc-config.mjs
+/public/svc-config.js

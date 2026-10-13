@@ -1,0 +1,2977 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent Console — Video KYC</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   TOKENS
+============================================================ */
+:root{
+  --navy:#0a1533; --navy-2:#111f47;
+  --blue:#2f45cc; --blue-deep:#25379f; --blue-pale:#e8edff;
+  --green:#0f7a4b; --green-dark:#0b5c38; --green-ink:#25654a;
+  --red:#c0392b; --amber:#f4b23d;
+  --ink:#1a1a1a; --ink-2:#2b2f3a; --grey:#6f7480; --grey-2:#9aa0ab;
+  --line:#e6e8ee; --card:#f4f5f8; --rail:#f7f8fb;
+  --sidebar-w:96px; --vid-w:440px; --rail-w:82px;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;background:#fff;color:var(--ink);
+  font-family:"Roboto",-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+button{font:inherit}
+[hidden]{display:none !important}
+
+/* ============================================================
+   SIDEBAR + SHELL (home)
+============================================================ */
+.sidebar{
+  position:fixed;top:0;left:0;bottom:0;width:var(--sidebar-w);background:var(--navy);
+  display:flex;flex-direction:column;align-items:center;padding-top:18px;z-index:5;
+}
+.collapse{
+  width:52px;height:52px;border-radius:10px;border:0;cursor:pointer;
+  background:var(--navy-2);color:#fff;display:grid;place-items:center;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.06);
+}
+.nav{margin-top:22px;width:100%}
+.nav a{width:100%;height:74px;display:grid;place-items:center;color:#8e97b5;transition:background .15s,color .15s}
+.nav a:hover{color:#fff}
+.nav a.active{background:var(--blue-deep);color:#fff}
+.collapse:focus-visible,.nav a:focus-visible{outline:2px solid #fff;outline-offset:-3px}
+
+#home{background:#f7f8fc;min-height:100vh}
+#home .box,#home .panel{background:#fff}
+.shell{margin-left:var(--sidebar-w);padding:26px 34px 60px;max-width:1680px}
+.topbar{display:flex;align-items:center;justify-content:flex-end;gap:18px;margin-bottom:26px}
+.hello{font-size:18px;font-weight:600;letter-spacing:-.01em}
+.kebab{
+  width:54px;height:54px;border-radius:10px;border:0;cursor:pointer;
+  background:var(--blue-deep);color:#fff;display:grid;place-items:center;
+}
+.kebab:focus-visible{outline:2px solid var(--navy);outline-offset:2px}
+.grid{display:grid;grid-template-columns:300px minmax(0,1fr) 330px;gap:34px;align-items:start}
+h2.sec{font-size:16px;font-weight:600;margin:0 0 16px;letter-spacing:-.01em}
+
+/* ---- stats ---- */
+.box{border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.box .head{padding:14px 18px;font-size:15px;font-weight:500}
+.box .head + .head{border-top:1px solid var(--line)}
+.box .head b{font-weight:600}
+.stat-grid{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--line);padding:14px 6px}
+.stat-grid p{margin:0;text-align:center;display:flex;flex-direction:column;gap:4px}
+.stat-grid b{font-size:19px;font-weight:500;font-variant-numeric:tabular-nums}
+.stat-grid span{font-size:12px;color:#3b3f4a;line-height:1.25}
+
+.last-outcome{
+  display:flex;align-items:center;gap:12px;margin-bottom:14px;background:#fafbfc;
+  border:1px solid var(--line);border-radius:10px;padding:13px 15px;
+}
+.lo-dot{width:10px;height:10px;border-radius:50%;flex:0 0 auto;background:#c3c8d4}
+.lo-dot.verified{background:var(--green-ink)}
+.lo-dot.rejected{background:var(--red)}
+.lo-dot.unable{background:var(--amber)}
+.lo-body{flex:1;min-width:0}
+.lo-body b{display:block;font-size:15px;font-weight:600;color:var(--navy)}
+.lo-reason{display:block;margin-top:2px;font-size:13px;color:var(--grey)}
+.lo-time{flex:0 0 auto;font-size:13px;color:var(--grey);font-variant-numeric:tabular-nums}
+
+/* ---- availability ---- */
+.avail-empty{
+  border:1px solid var(--line);border-radius:10px;background:#fff;
+  padding:30px 18px;text-align:center;color:var(--grey-2);
+}
+.avail-empty p{margin:12px 0 0;font-size:14px;color:#3b3f4a}
+.avail{border:1px solid var(--line);border-radius:10px;padding:18px}
+.avail .r{display:flex;justify-content:space-between;font-size:14px;color:#3b3f4a}
+.avail .v{display:flex;justify-content:space-between;font-size:20px;font-weight:600;margin-top:4px;font-variant-numeric:tabular-nums}
+.bar{height:5px;border-radius:99px;background:var(--line);margin:20px 0 12px;overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--blue);transition:width .4s}
+.avail .foot{display:flex;justify-content:space-between;font-size:12.5px;font-style:italic;color:var(--grey)}
+
+/* ---- centre stage ---- */
+.banner{
+  background:var(--navy);border-radius:10px;padding:22px 20px 22px 26px;
+  display:flex;align-items:center;gap:16px;color:#fff;
+}
+.banner .t{flex:1;font-size:18px;font-weight:600;letter-spacing:-.01em}
+.banner .pick{
+  width:64px;height:64px;border-radius:8px;border:0;cursor:pointer;
+  background:var(--green);color:#fff;display:grid;place-items:center;
+}
+.banner .pick:hover{background:var(--green-dark)}
+.banner .pick:focus-visible{outline:2px solid #fff;outline-offset:2px}
+
+.stage{display:flex;flex-direction:column;align-items:center;text-align:center;padding:46px 20px 60px}
+.stage .pair{width:min(520px,92%);height:auto;color:#c9cbd1;margin-bottom:30px;transition:color .2s}
+.stage-title{margin:0;font-size:26px;font-weight:700;color:#0d0d10;letter-spacing:-.02em;line-height:1.1}
+.stage-title span{color:#f2415c;transition:color .2s}
+.stage-sub{margin:14px 0 0;font-size:14px;font-weight:500;color:#8b93a7;line-height:1.4}
+#stage.online .pair{color:#2d4bb9}
+#stage.online .stage-title span{color:#29ba83}
+#stage.online .link-off{display:none}
+.link-on{display:none}
+#stage.online .link-on{display:inline}
+
+/* ---- status panel ---- */
+.panel{border:1px solid var(--line);border-radius:10px;padding:22px}
+.status-row{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.status-row .lbl{font-size:16px;font-weight:600}
+.status-row .state{font-size:14px;font-weight:600;color:var(--red)}
+.status-row .state.on{color:var(--green-ink)}
+.status-toggle{display:flex;align-items:center;gap:10px;flex:0 0 auto}
+.qlabel{display:block;margin:22px 0 8px;font-size:13.5px;color:var(--grey)}
+select{
+  width:100%;font:inherit;font-size:15px;font-weight:600;color:var(--ink);
+  padding:11px 14px;border:1px solid var(--line);border-radius:8px;background:#fff;
+  appearance:none;cursor:pointer;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' fill='none' stroke='%236f7480' stroke-width='2' stroke-linecap='round'><path d='M4 7l5 5 5-5'/></svg>");
+  background-repeat:no-repeat;background-position:right 16px center;
+}
+select:focus-visible{outline:2px solid var(--blue);outline-offset:1px}
+
+/* ---- switches ---- */
+.switch{position:relative;width:62px;height:34px;flex:0 0 auto}
+.switch input{position:absolute;inset:0;opacity:0;margin:0;cursor:pointer}
+.switch .track{position:absolute;inset:0;border-radius:99px;background:#f6d3d0;transition:background .18s;pointer-events:none}
+.switch .track::after{
+  content:"";position:absolute;top:4px;left:4px;width:26px;height:26px;border-radius:50%;
+  background:#fff;transition:transform .18s;
+}
+.switch input:checked + .track{background:var(--green)}
+.switch input:checked + .track::after{transform:translateX(28px)}
+.switch input:focus-visible + .track{outline:2px solid var(--blue);outline-offset:2px}
+.switch .tick{
+  position:absolute;top:9px;right:11px;width:16px;height:16px;color:var(--green);
+  opacity:0;transition:opacity .18s;pointer-events:none;
+}
+.switch input:checked ~ .tick{opacity:1}
+
+.onoff{position:relative;display:inline-block;width:82px;height:38px}
+.onoff input{position:absolute;inset:0;opacity:0;margin:0;cursor:pointer}
+.onoff-track{
+  position:absolute;inset:0;border-radius:99px;background:#c3c8d4;
+  display:flex;align-items:center;pointer-events:none;transition:background .18s;
+}
+.onoff-track .knob{width:30px;height:30px;border-radius:50%;background:#fff;margin-left:4px;flex:0 0 auto;transition:transform .18s}
+.onoff-track em{flex:1;text-align:center;font-style:normal;font-size:14px;font-weight:700;color:#fff;letter-spacing:.03em}
+.onoff input:checked + .onoff-track{background:#7c828d}
+.onoff input:not(:checked) + .onoff-track .knob{transform:translateX(44px)}
+.onoff input:not(:checked) + .onoff-track em{order:-1}
+.onoff input:focus-visible + .onoff-track{outline:2px solid var(--blue);outline-offset:2px}
+
+/* ============================================================
+   SESSION SHELL
+============================================================ */
+#session{position:fixed;inset:0;z-index:15;display:flex;flex-direction:column;background:#fff}
+.s-top{display:flex;align-items:center;gap:26px;padding:14px 26px;border-bottom:1px solid var(--line);flex:0 0 auto}
+.brand{display:flex;align-items:center;flex:0 0 auto;line-height:0}
+.brand-mark{display:block;height:30px;width:auto}
+.dur{font-size:15px;font-weight:600;font-variant-numeric:tabular-nums}
+.s-mid{flex:1;display:flex;align-items:center;justify-content:center;gap:14px}
+.s-lbl{font-size:14px;font-weight:600}
+.s-right{display:flex;align-items:center;gap:14px}
+.linky{background:none;border:0;padding:0;cursor:pointer;font-size:14px;font-weight:600;color:var(--blue)}
+.linky:hover{text-decoration:underline}
+.linky:focus-visible{outline:2px solid var(--blue);outline-offset:3px;border-radius:4px}
+
+/* ---- camera diagnostics banner ---- */
+.cam-banner{
+  display:flex;gap:24px;align-items:flex-start;justify-content:space-between;
+  padding:16px 26px;background:#fff6e8;border-bottom:1px solid #f0cfa8;flex:0 0 auto;
+}
+.cb-main{min-width:0}
+.cb-main strong{display:block;font-size:15px;color:#7a4a00;margin-bottom:3px}
+.cb-main p{margin:0;font-size:13.5px;color:#5c4520;line-height:1.5}
+.cb-fix{margin-top:6px !important;font-weight:500}
+.cb-diag{
+  display:flex;flex-wrap:wrap;gap:6px 16px;margin:10px 0 0;padding:0;list-style:none;
+  font-family:ui-monospace,Menlo,monospace;font-size:11.5px;color:#8a6a3a;
+}
+.cb-diag li{white-space:nowrap}
+.cb-diag b{font-weight:600}
+.cb-diag li.bad b{color:#b3261e}
+.cb-diag li.good b{color:#1a5c3a}
+code{font-family:ui-monospace,Menlo,monospace;background:#fff;padding:1px 6px;border-radius:4px}
+.cb-acts{display:flex;gap:10px;flex:0 0 auto}
+.cb-btn{
+  font-size:13.5px;font-weight:600;padding:10px 16px;border-radius:8px;cursor:pointer;
+  background:var(--blue);color:#fff;border:1px solid var(--blue);white-space:nowrap;
+}
+.cb-btn.ghost{background:transparent;color:#7a4a00;border-color:#d9b483}
+.cb-btn:focus-visible{outline:2px solid var(--navy);outline-offset:2px}
+
+/* ---- body split ---- */
+.s-body{
+  flex:1;min-height:0;display:grid;align-items:stretch;
+  grid-template-columns:var(--vid-w) var(--rail-w) minmax(0,1fr);
+  grid-template-rows:minmax(0,1fr);
+}
+
+/* ---- video column ---- */
+.vid-col{background:#0d0f14;display:flex;flex-direction:column;min-height:0;height:100%}
+.stage-vid{position:relative;flex:1 1 auto;min-height:0;overflow:hidden}
+.feed{
+  position:absolute;inset:0;display:grid;place-items:center;
+  background:radial-gradient(120% 90% at 50% 40%,#2b3a4d 0%,#10141b 70%);
+}
+.feed.off{background:#0d0f14}
+.feed video{width:100%;height:100%;object-fit:cover;display:none}
+.feed.live video{display:block}
+.feed.live .ph{display:none}
+.ph{color:#7f8a9c;text-align:center}
+.ph p{margin:10px 0 0;font-size:14px;letter-spacing:.02em}
+.ph.small p{font-size:11px;margin-top:4px}
+.tag{
+  position:absolute;width:28px;height:28px;border-radius:6px;display:grid;place-items:center;
+  background:#1c2b3a;color:#fff;font-size:14px;font-weight:600;
+}
+.tag.tl{top:14px;right:14px}
+.pip-tag{top:8px;right:8px;width:24px;height:24px;font-size:12px}
+.net{position:absolute;display:flex;flex-direction:column;align-items:flex-end;gap:8px}
+.net.tr{top:52px;right:14px}
+.pills{display:flex;gap:6px}
+.pill{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;color:#fff}
+.pill.blue{background:#2f7ff0}
+.pill.ghost{background:transparent}
+.rates{background:#1b2534;border-radius:8px;padding:8px 12px;display:flex;flex-direction:column;gap:8px}
+.rates span{display:flex;align-items:baseline;gap:6px;color:#fff}
+.rates svg{align-self:center;opacity:.85}
+.rates b{font-size:15px;font-weight:600;font-variant-numeric:tabular-nums}
+.rates small{font-size:10px;opacity:.7}
+
+.pip{
+  position:absolute;bottom:14px;right:14px;width:200px;aspect-ratio:4/3;
+  border-radius:8px;overflow:hidden;background:#151a22;
+  display:grid;place-items:center;box-shadow:0 6px 20px rgba(0,0,0,.4);
+}
+.pip video{width:100%;height:100%;object-fit:cover;display:none;transform:scaleX(-1)}
+.pip.live video{display:block}
+.pip.live .ph{display:none}
+.pip .ph{position:relative;z-index:2;padding:8px 10px}
+.pip-net{bottom:8px;left:8px;align-items:flex-start;z-index:1}
+.pip.blocked .pip-net{display:none}
+.pip-net .rates{padding:6px 9px;gap:5px}
+.pip-net .rates b{font-size:14px}
+.cam-start{
+  display:block;margin:8px auto 0;font-size:12px;font-weight:600;padding:7px 12px;
+  border-radius:6px;cursor:pointer;background:var(--blue);color:#fff;border:0;
+}
+.cam-start:hover{background:var(--blue-deep)}
+.cam-start:focus-visible{outline:2px solid #fff;outline-offset:2px}
+.cam-err{display:none;margin:8px 0 0;font-size:10.5px;line-height:1.45;color:#f0a89c;max-width:170px}
+.cam-err.show{display:block}
+.pip.live .cam-start,.pip.live .cam-err{display:none}
+
+.vid-bar{
+  flex:0 0 auto;display:flex;align-items:center;gap:14px;padding:16px 18px;
+  background:#fff;border-top:1px solid var(--line);
+}
+.rnd{
+  width:46px;height:46px;border-radius:14px;cursor:pointer;display:grid;place-items:center;
+  background:#fff;border:1.5px solid var(--blue);color:var(--blue);
+  transition:background .15s,border-color .15s,color .15s;
+}
+.rnd:hover{background:var(--blue-pale)}
+.rnd[aria-pressed="false"]{position:relative;border-color:#c3c8d4;color:var(--grey-2)}
+.rnd[aria-pressed="false"]::after{
+  content:"";position:absolute;left:9px;right:9px;top:50%;height:2.5px;
+  background:#d93a2b;border-radius:2px;transform:rotate(-45deg);
+}
+.cam-pick{display:flex;align-items:center;gap:8px;margin-left:6px;font-size:12px;color:var(--grey);min-width:0}
+.cam-pick select{
+  font-size:12px;font-weight:500;padding:8px 28px 8px 10px;max-width:190px;
+  border-radius:8px;border:1px solid #c3c8d4;background-color:#fff;color:var(--ink-2);
+}
+.reconnect{
+  margin-left:auto;display:flex;align-items:center;gap:10px;cursor:pointer;
+  font-size:15px;font-weight:600;color:var(--blue);
+  background:#fff;border:1.5px solid var(--blue);border-radius:14px;padding:11px 18px;
+}
+.reconnect:hover{background:var(--blue-pale)}
+.rnd:focus-visible,.reconnect:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+
+/* ---- step rail ---- */
+.rail{
+  background:var(--rail);border-right:1px solid var(--line);overflow-y:auto;
+  display:flex;flex-direction:column;align-items:center;gap:10px;padding:20px 0;
+}
+.step{
+  width:38px;height:38px;flex:0 0 auto;border-radius:8px;cursor:pointer;
+  font-size:15px;font-weight:600;display:grid;place-items:center;
+  background:#fff;border:1px solid var(--line);color:var(--ink-2);
+  transition:background .15s,color .15s,border-color .15s;
+}
+.step:hover{border-color:var(--blue)}
+.step.done{background:var(--green-ink);border-color:var(--green-ink);color:#fff}
+.step.current{border:2px solid var(--blue);color:var(--blue)}
+.step:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+
+/* ============================================================
+   TASK PANE
+============================================================ */
+.task-pane{display:flex;flex-direction:column;min-height:0}
+.tasks{flex:1 1 auto;overflow-y:auto;padding:22px 26px 0;min-height:0}
+.tasks-pad{height:12px}
+.task{margin-bottom:22px}
+.task:last-of-type{margin-bottom:0}
+.t-head{display:flex;align-items:center;gap:10px}
+.t-head .num{
+  min-width:24px;height:24px;padding:0 6px;flex:0 0 auto;border-radius:5px;
+  display:grid;place-items:center;font-size:13px;font-weight:600;
+  background:var(--rail);border:1px solid var(--line);color:var(--ink-2);
+}
+.t-head .num.icon{width:24px;padding:0;background:#eef0f4;border-color:#eef0f4;color:var(--navy)}
+.t-head h4{margin:0;flex:0 1 auto;font-size:16px;font-weight:600;color:var(--navy);letter-spacing:.02em;line-height:1.3}
+.t-head .rem{margin-left:auto;flex:0 0 auto;font-size:14px;color:var(--grey);white-space:nowrap;text-align:right}
+.t-head .rem.clear{color:var(--green-ink);font-weight:500}
+.rem.fetched{display:inline-flex;align-items:center;gap:8px;color:var(--green-ink);font-weight:500}
+.t-head h4 .rem.fetched{margin-left:14px;font-size:14px;vertical-align:baseline}
+
+.t-card{border:1px solid var(--line);border-radius:10px;margin-top:14px;padding:18px}
+.t-card.tight{padding:14px 18px}
+.task.info{border:1px solid var(--line);border-radius:10px;padding:18px 20px}
+.task.info .t-head{margin-bottom:18px}
+.note{margin:0 0 18px;background:#fdf6e0;border-radius:6px;padding:13px 15px;font-size:14px;color:var(--ink-2)}
+
+.kv{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 28px}
+.kv p{margin:0;display:flex;align-items:center;gap:8px;font-size:14px;color:var(--ink-2);white-space:nowrap;min-width:0}
+.kv p > span{overflow:hidden;text-overflow:ellipsis}
+.kv p.span2{grid-column:1/-1}
+.kv b{font-weight:600;color:var(--navy)}
+.ip-flag{font-weight:600}
+.ip-flag.ok{color:var(--green-ink)}
+.ip-flag.bad{color:var(--red)}
+.eyebrow{
+  margin:22px 0 14px;padding-top:20px;border-top:1px solid var(--line);
+  font-size:14px;font-weight:600;color:var(--grey-2);letter-spacing:.02em;
+}
+.line{margin:0 0 10px;font-size:14px;color:var(--ink-2);line-height:1.55}
+.line:last-child{margin-bottom:0}
+.line b{font-weight:600;color:var(--navy)}
+.line .sep{margin:0 12px;color:#c3c8d4}
+
+.copy{
+  background:none;border:0;padding:5px;cursor:pointer;color:var(--navy);border-radius:6px;
+  line-height:0;transition:background .15s,color .15s,box-shadow .15s;
+}
+.copy:hover{background:#eef0f4}
+.copy.done{color:var(--green-ink);background:rgba(37,101,74,.14);box-shadow:0 0 0 3px rgba(37,101,74,.16)}
+.copy:focus-visible{outline:2px solid var(--blue);outline-offset:1px}
+
+/* ---- rows ---- */
+.rows{margin-top:22px;border-top:1px solid var(--line)}
+.t-card > .rows:first-child,.doc-group .rows{margin-top:0;border-top:0}
+.row-item{
+  display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+  padding:14px 4px;border-bottom:1px solid var(--line);
+}
+.row-item.done{background:#fafcfb}
+.row-lbl{flex:1;min-width:180px;font-size:15px;font-weight:600;color:var(--navy)}
+.row-out{font-size:14px;color:var(--grey);font-variant-numeric:tabular-nums}
+.row-out.ok{color:var(--green-ink);font-weight:600}
+.row-out.bad{color:var(--red);font-weight:600}
+.row-out .pct{font-size:15px}
+.src-pill{
+  display:inline-block;margin-left:8px;padding:8px 16px;border-radius:6px;line-height:1;
+  font-style:normal;font-size:11px;font-weight:500;white-space:nowrap;
+  background:#eef0f4;color:var(--grey);
+}
+.src-pill.live{background:var(--blue-pale);color:var(--blue-deep)}
+.t-actions{display:flex;gap:16px;justify-content:flex-end}
+
+/* ---- verdict + chip controls ---- */
+.verdict{
+  min-width:78px;padding:8px 16px;border-radius:99px;cursor:pointer;
+  font-size:14px;font-weight:600;background:#fff;
+}
+.verdict.sm{min-width:68px;padding:7px 14px;font-size:13.5px}
+.verdict.pass{border:1.5px solid var(--green-ink);color:var(--green-ink)}
+.verdict.pass:hover:not(:disabled){background:#f1faf5}
+.verdict.fail{border:1.5px solid var(--red);color:var(--red)}
+.verdict.fail:hover:not(:disabled){background:#fdf3f1}
+.verdict:disabled{opacity:.4;cursor:not-allowed}
+.verdict[aria-pressed="true"].pass{background:var(--green-ink);color:#fff}
+.verdict[aria-pressed="true"].fail{background:var(--red);color:#fff}
+.verdict:focus-visible{outline:2px solid var(--navy);outline-offset:3px}
+.chip{
+  font-size:14px;font-weight:600;padding:8px 16px;border-radius:99px;cursor:pointer;
+  background:var(--card);border:1px solid #c3c8d4;color:var(--grey);
+}
+.chip:hover:not(:disabled){background:var(--blue-pale);border-color:var(--blue);color:var(--blue)}
+.chip:disabled{opacity:.55;cursor:not-allowed}
+.chip:focus-visible{outline:2px solid var(--blue);outline-offset:3px}
+.chip-sm{
+  font-size:13.5px;font-weight:600;padding:7px 14px;border-radius:99px;cursor:pointer;
+  background:#fff;border:1.5px solid var(--blue);color:var(--blue);
+}
+.chip-sm:hover{background:var(--blue-pale)}
+.chip-sm.solid{background:var(--blue-deep);border-color:var(--blue-deep);color:#fff}
+.chip-sm.solid:hover{background:#1d2b80}
+.chip-sm:focus-visible{outline:2px solid var(--navy);outline-offset:2px}
+
+/* ---- remarks ---- */
+.remark{display:flex;align-items:center;gap:12px;margin-top:18px}
+.remark .av{
+  width:38px;height:38px;flex:0 0 auto;border-radius:50%;background:#eef0f4;
+  display:grid;place-items:center;color:var(--ink-2);
+}
+.remark input{
+  flex:1;font:inherit;font-size:14px;padding:12px 14px;border:0;border-radius:6px;
+  background:var(--card);color:var(--ink);
+}
+.remark input::placeholder{color:var(--grey-2)}
+.remark input:focus{outline:2px solid var(--blue)}
+.remark + .t-actions{margin-top:20px}
+
+/* ---- random code field ---- */
+.code-field{
+  display:flex;align-items:stretch;width:100%;max-width:660px;overflow:hidden;
+  border:1px solid #8b909c;border-radius:10px;background:#fff;
+}
+.code-field input{
+  flex:1;min-width:0;border:0;background:transparent;font:inherit;
+  font-size:16px;font-weight:600;letter-spacing:.18em;color:var(--ink);padding:13px 15px;
+}
+.code-field input::placeholder{color:#c3c8d4;font-weight:500;letter-spacing:normal;font-size:15px}
+.code-field input:focus{outline:0}
+.code-field input.auto{color:var(--grey-2)}
+.code-field:focus-within{border-color:var(--blue);box-shadow:0 0 0 2px rgba(47,69,204,.18)}
+.gen-btn{
+  display:flex;align-items:center;gap:10px;flex:0 0 auto;background:transparent;
+  border-left:1px solid var(--line);padding:0 20px;font-size:15px;
+}
+.gen-btn:hover{background:var(--blue-pale);text-decoration:none}
+.gen-btn:focus-visible{outline:2px solid var(--blue);outline-offset:-3px}
+
+/* ---- selfie pair ---- */
+/* image on the left, status + actions on the right */
+.cap-panel{display:flex;gap:34px;align-items:stretch;flex-wrap:wrap}
+.cap-preview{
+  flex:0 1 430px;min-width:250px;aspect-ratio:16/10;padding:0;cursor:pointer;
+  border:1px solid var(--blue);border-radius:8px;background:#fff;overflow:hidden;
+  display:grid;place-items:center;
+}
+.cap-preview img{width:100%;height:100%;object-fit:contain;display:none}
+.cap-preview.has img{display:block}
+.cap-preview.has .cap-empty{display:none}
+.cap-preview:disabled{cursor:default}
+.cap-preview:not(:disabled):hover{border-color:var(--blue-deep)}
+.cap-preview:focus-visible{outline:2px solid var(--blue);outline-offset:3px}
+.cap-empty{display:flex;flex-direction:column;align-items:center;gap:12px}
+.cap-empty .lens{width:64px;height:64px;border-radius:50%;background:#eef1f7;display:grid;place-items:center;color:var(--navy)}
+.cap-empty em{font-style:normal;font-size:14px;font-weight:600;color:#8b90a0}
+
+.cap-side{flex:1 1 240px;min-width:210px;display:flex;flex-direction:column;gap:6px;padding-top:6px}
+.cap-status{
+  display:flex;align-items:center;gap:12px;margin:0;
+  font-size:15px;font-weight:500;color:var(--green-ink);
+}
+.cap-status svg{flex:0 0 auto}
+.cap-status.empty{color:var(--grey-2)}
+.cap-status.empty svg{display:none}
+.cap-ctas{margin-top:auto;display:flex;gap:12px;flex-wrap:wrap}
+.cta{
+  display:inline-flex;align-items:center;gap:8px;padding:10px 18px;border-radius:99px;
+  cursor:pointer;font-size:13.5px;font-weight:600;letter-spacing:.03em;
+}
+.cta.solid{background:#fff;border:1.5px solid var(--blue);color:var(--blue)}
+.cta.solid:hover:not(:disabled){background:var(--blue-pale)}
+.cta.ghost{background:#fff;border:1.5px solid var(--red);color:var(--red)}
+.cta.ghost:hover:not(:disabled){background:#fdf3f1}
+.cta:disabled{opacity:.45;cursor:not-allowed}
+.cta:focus-visible{outline:2px solid var(--navy);outline-offset:3px}
+
+/* ---- capture tiles ---- */
+.shot-wrap{position:relative;display:block;max-width:420px}
+.shot-wrap.pan-wrap{max-width:380px}
+.shot{
+  width:100%;aspect-ratio:16/10;border:1px solid #cfd6e4;border-radius:8px;background:#fff;
+  cursor:pointer;display:grid;place-items:center;align-content:center;gap:12px;color:var(--ink-2);
+}
+.shot.pan{aspect-ratio:4/3;margin-bottom:4px}
+.shot:hover{border-color:var(--blue)}
+.shot .lens{width:64px;height:64px;border-radius:50%;background:#eef1f7;display:grid;place-items:center;color:var(--navy)}
+.shot em{font-style:normal;font-size:14px;font-weight:600;color:#8b90a0}
+.shot.taken{border-color:var(--green-ink)}
+.shot.taken .lens{background:#dff1e7;color:var(--green-ink)}
+.shot.filled em,.shot.filled .lens{display:none}
+.shot:focus-visible{outline:2px solid var(--blue);outline-offset:3px}
+.shot-del{
+  position:absolute;top:10px;right:10px;width:34px;height:34px;border-radius:8px;border:0;
+  cursor:pointer;background:rgba(255,255,255,.92);color:var(--red);
+  display:grid;place-items:center;box-shadow:0 2px 8px rgba(0,0,0,.18);
+}
+.shot-del:hover{background:#fff;color:#a02718}
+.shot-del:focus-visible{outline:2px solid var(--red);outline-offset:2px}
+.received{display:flex;align-items:center;gap:16px;flex-wrap:wrap;justify-content:space-between}
+.rcv-time{font-size:13px;color:var(--grey);font-variant-numeric:tabular-nums}
+.rcv-acts{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+
+/* ---- document validation ---- */
+.doc-group + .doc-group{margin-top:24px;padding-top:20px;border-top:1px solid var(--line)}
+.doc-title{margin:0 0 2px;font-size:14px;font-weight:600;color:var(--blue-deep);letter-spacing:.05em;text-transform:uppercase}
+.extract-out{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px 24px;
+  background:var(--rail);border-radius:8px;padding:14px 16px;margin:2px 0 4px;
+}
+.extract-out p{margin:0;display:flex;flex-direction:column;gap:2px;font-size:14px}
+.extract-out b{font-size:12px;font-weight:600;color:var(--grey);letter-spacing:.04em;text-transform:uppercase}
+.ocr-field{
+  font:inherit;font-size:14px;font-weight:500;color:var(--ink);width:100%;min-width:0;
+  border:1px solid transparent;background:transparent;border-radius:5px;padding:4px 6px;
+}
+.ocr-field[readonly]{cursor:default}
+.extract-out.editing .ocr-field{border-color:#c3c8d4;background:#fff}
+.extract-out.editing .ocr-field:focus{outline:2px solid var(--blue);outline-offset:-1px;border-color:var(--blue)}
+.ocr-bar{
+  grid-column:1/-1;display:flex;align-items:center;justify-content:flex-end;gap:16px;flex-wrap:wrap;
+  margin-top:10px;padding-top:12px;border-top:1px solid #e2e5ee;
+}
+.ocr-bar .row-out{font-size:14px;color:var(--grey)}
+.ocr-bar .chip{background:#fff}
+
+/* ---- scripted questions ---- */
+.qblock{padding:20px 4px;border-bottom:1px solid var(--line)}
+.qblock.done{background:#fafcfb}
+.qtext p{margin:0;font-size:15px;color:var(--ink-2);line-height:1.4}
+.expect{display:block;margin:6px 0 0;font-size:13.5px;color:var(--grey);line-height:1.4}
+.expect i{font-style:italic}
+.expect b{font-style:italic;font-weight:600;color:var(--ink-2)}
+
+/* ---- final verdict bar ---- */
+.verdict-bar{
+  flex:0 0 auto;display:flex;justify-content:flex-end;gap:14px;
+  padding:14px 26px;border-top:1px solid var(--line);background:#fff;
+}
+.final{padding:11px 22px;border-radius:99px;cursor:pointer;font-size:15px;font-weight:600;background:#fff}
+.final.amber{border:1.5px solid var(--amber);color:#8f5f0c}
+.final.amber:hover{background:#fef6e8}
+.final.red{border:1.5px solid var(--red);color:var(--red)}
+.final.red:hover{background:#fdf3f1}
+.final.green{border:1.5px solid var(--green-ink);color:var(--green-ink)}
+.final.green:hover:not(:disabled){background:#f1faf5}
+.final:disabled{opacity:.45;cursor:not-allowed}
+.final:focus-visible{outline:2px solid var(--navy);outline-offset:3px}
+
+.chat-fab{
+  position:fixed;bottom:74px;right:20px;width:52px;height:52px;border-radius:12px;border:0;
+  cursor:pointer;background:var(--navy);color:#fff;display:grid;place-items:center;
+  box-shadow:0 8px 24px rgba(10,21,51,.3);z-index:18;
+}
+.chat-fab:focus-visible{outline:2px solid var(--blue);outline-offset:3px}
+
+/* ============================================================
+   MODALS
+============================================================ */
+/* session-level overlays clear the live camera column */
+.cap-overlay{
+  position:fixed;top:0;right:0;bottom:0;left:calc(var(--vid-w) + var(--rail-w));
+  background:rgba(15,23,42,.62);z-index:40;
+  display:flex;align-items:center;justify-content:center;padding:24px;
+}
+.cap-box,.edit-box,.view-box,.reason-box{
+  background:#fff;border-radius:12px;width:100%;position:relative;
+  box-shadow:0 30px 70px rgba(2,6,23,.4);
+}
+.cap-box{max-width:560px;padding:18px 18px 0}
+.edit-box{max-width:640px;padding:20px 24px 22px}
+.view-box{max-width:640px;padding:20px 24px 22px}
+.reason-box{max-width:460px;padding:26px 28px 24px}
+.cap-box h3,.edit-box h3,.view-box h3,.reason-box h3{margin:0 0 16px;font-size:16px;font-weight:600}
+.cap-x{
+  position:absolute;top:14px;right:16px;background:none;border:0;cursor:pointer;
+  color:var(--ink);padding:4px;border-radius:6px;line-height:0;z-index:2;
+}
+.cap-x:hover{background:var(--card)}
+.cap-x:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+
+/* ---- image capture ---- */
+.cap-stage{position:relative;background:#0d0f14;border-radius:6px;overflow:hidden;aspect-ratio:4/3}
+.cap-stage video{width:100%;height:100%;object-fit:cover;display:block}
+.cap-frame{
+  position:absolute;left:18%;top:20%;width:64%;height:56%;
+  border:3px solid rgba(255,255,255,.95);border-radius:6px;pointer-events:none;
+}
+.cap-bar{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  background:#1c1f26;margin:0 -18px;padding:16px 22px;border-radius:0 0 12px 12px;
+}
+.cap-tool{
+  background:none;border:0;cursor:pointer;color:#fff;display:grid;justify-items:center;gap:6px;
+  font-size:11.5px;padding:4px;border-radius:8px;max-width:120px;
+}
+.cap-tool em{font-style:normal;line-height:1.25;text-align:center}
+.cap-tool[aria-pressed="false"]{opacity:.5}
+.cap-tool .hd{
+  display:grid;place-items:center;width:34px;height:24px;border:2px solid currentColor;
+  border-radius:5px;font-size:11px;font-weight:700;
+}
+.cap-tool:hover{background:rgba(255,255,255,.1)}
+.shutter{
+  width:58px;height:58px;border-radius:50%;cursor:pointer;flex:0 0 auto;
+  background:#fff;border:4px solid #1c1f26;box-shadow:0 0 0 3px #fff;
+}
+.shutter:active{transform:scale(.94)}
+.cap-tool:focus-visible,.shutter:focus-visible{outline:2px solid #fff;outline-offset:3px}
+
+/* ---- edit screenshot ---- */
+.edit-stage{
+  position:relative;background:#8f97a3;border-radius:4px;overflow:hidden;
+  display:grid;place-items:center;min-height:280px;max-height:54vh;
+}
+.edit-stage canvas{max-width:100%;max-height:54vh;display:block;transition:transform .12s}
+.crop-rect{
+  position:absolute;border:2px dashed #fff;background:rgba(47,69,204,.14);
+  cursor:move;box-shadow:0 0 0 9999px rgba(0,0,0,.3);
+}
+.crop-h{
+  position:absolute;right:-7px;bottom:-7px;width:14px;height:14px;background:#fff;
+  border:2px solid var(--blue);border-radius:3px;cursor:nwse-resize;
+}
+.edit-bar{display:flex;align-items:center;gap:6px;background:#1c1f26;padding:10px 16px;border-radius:0 0 4px 4px}
+.edit-tool{
+  background:none;border:0;cursor:pointer;color:#fff;font-size:11.5px;
+  display:grid;justify-items:center;gap:3px;padding:6px 14px;border-radius:8px;
+}
+.edit-tool em{font-style:normal}
+.edit-tool:hover{background:rgba(255,255,255,.12)}
+.edit-tool.on{background:var(--blue)}
+.edit-tool:focus-visible{outline:2px solid #fff;outline-offset:2px}
+.zooms{margin-left:auto;display:flex;gap:2px}
+.front-opt{display:flex;align-items:center;gap:10px;justify-content:center;margin:20px 0 22px;font-size:14px}
+.front-opt input{width:20px;height:20px;accent-color:var(--blue);cursor:pointer}
+.edit-acts{display:flex;gap:18px;justify-content:center}
+.e-btn{font-size:14px;font-weight:600;letter-spacing:.04em;padding:11px 24px;border-radius:99px;cursor:pointer}
+.e-btn.ghost{background:#fff;border:1.5px solid var(--blue);color:var(--blue)}
+.e-btn.ghost:hover{background:var(--blue-pale)}
+.e-btn.solid{background:var(--blue-deep);border:1.5px solid var(--blue-deep);color:#fff}
+.e-btn.solid:hover{background:#1d2b80}
+.e-btn:focus-visible{outline:2px solid var(--navy);outline-offset:3px}
+
+/* ---- image viewer ---- */
+.view-stage{background:#8f97a3;border-radius:6px;display:grid;place-items:center;max-height:62vh;overflow:hidden}
+.view-stage img{max-width:100%;max-height:62vh;display:block}
+.view-acts{display:flex;gap:18px;justify-content:center;margin-top:22px}
+
+/* ---- reason dialog ---- */
+.reason-sub{margin:0 0 20px;font-size:13.5px;color:var(--grey);line-height:1.5}
+.reason-field{display:block;margin-bottom:16px}
+.reason-field > span{
+  display:block;margin-bottom:7px;font-size:12.5px;font-weight:600;
+  letter-spacing:.03em;text-transform:uppercase;color:var(--grey);
+}
+.reason-field > span em{font-style:normal;font-weight:500;text-transform:none;letter-spacing:0}
+.reason-field select,.reason-field input{
+  width:100%;font:inherit;font-size:14px;padding:12px 14px;
+  border:1px solid #c3c8d4;border-radius:8px;background:#fff;color:var(--ink);
+}
+.reason-field select:focus,.reason-field input:focus{outline:2px solid var(--blue);outline-offset:-1px;border-color:var(--blue)}
+.reason-acts{display:flex;gap:12px;justify-content:flex-end;margin-top:22px}
+
+/* ---- incoming call modal ---- */
+.overlay{
+  position:fixed;inset:0;z-index:20;background:rgba(120,124,134,.45);backdrop-filter:blur(1px);
+  display:none;align-items:center;justify-content:center;padding:24px;
+}
+.overlay.show{display:flex}
+.modal{
+  background:#fff;border-radius:10px;padding:56px 48px 44px;width:100%;max-width:440px;
+  text-align:center;box-shadow:0 30px 80px rgba(10,21,51,.25);
+}
+.modal h3{margin:0 0 30px;font-size:16px;font-weight:600;letter-spacing:-.01em}
+.ring{width:170px;height:170px;margin:0 auto 30px;position:relative;display:grid;place-items:center}
+.ring::before{content:"";position:absolute;inset:6px;border-radius:50%;background:#e9f0ec}
+.ring::after{
+  content:"";position:absolute;inset:6px;border-radius:50%;
+  box-shadow:0 0 0 0 rgba(34,192,125,.55);animation:ringPulse 1.8s ease-out infinite;
+}
+@keyframes ringPulse{
+  0%{box-shadow:0 0 0 0 rgba(34,192,125,.5)}
+  70%{box-shadow:0 0 0 18px rgba(34,192,125,0)}
+  100%{box-shadow:0 0 0 0 rgba(34,192,125,0)}
+}
+.ring .arc{position:absolute;inset:0;z-index:1;animation:spin 1.5s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.ring .dot{
+  position:relative;z-index:2;width:104px;height:104px;border-radius:50%;
+  background:var(--blue-deep);display:grid;place-items:center;color:#fff;
+}
+.count{background:var(--blue-pale);border-radius:10px;padding:22px 16px 18px;margin-bottom:30px}
+.count span{display:block;font-size:14px;font-weight:600;color:var(--blue-deep)}
+.count strong{display:block;margin-top:10px;font-size:40px;line-height:1;font-weight:600;color:var(--blue);font-variant-numeric:tabular-nums}
+.count strong i{font-size:16px;font-weight:500;font-style:normal;margin-left:4px}
+.accept{
+  width:100%;padding:14px;border-radius:8px;cursor:pointer;font-size:16px;font-weight:600;
+  color:var(--green-dark);background:#fff;border:1.5px solid var(--green-dark);
+}
+.accept:hover{background:#f2fbf6}
+.accept:focus-visible{outline:2px solid var(--green-dark);outline-offset:3px}
+.warn{
+  display:none;margin-top:16px;font-size:13px;color:#8a5300;
+  background:#fff8e6;border:1px solid #f5d98a;border-radius:8px;padding:10px 12px;
+}
+.warn.show{display:block}
+
+/* ============================================================
+   RESPONSIVE
+============================================================ */
+@media (max-width:1240px){
+  .cap-overlay{left:0}
+  .s-body{grid-template-columns:1fr;grid-template-rows:auto auto minmax(0,1fr)}
+  .vid-col{height:44vh}
+  .rail{flex-direction:row;border-right:0;border-bottom:1px solid var(--line);padding:14px 18px}
+  .s-mid{display:none}
+}
+@media (max-width:1180px){
+  .grid{grid-template-columns:1fr}
+}
+@media (max-width:900px){
+  .kv{grid-template-columns:1fr}
+}
+@media (max-width:760px){
+  .s-top{flex-wrap:wrap;gap:12px;padding:12px 16px}
+  .s-right{width:100%;justify-content:space-between}
+  .verdict-bar{flex-wrap:wrap;justify-content:stretch}
+  .final{flex:1;padding:13px 12px}
+  .chat-fab{bottom:150px}
+}
+@media (max-width:640px){
+  :root{--sidebar-w:64px}
+  .shell{padding:18px 16px 48px}
+  .modal{padding:36px 24px 28px}
+  .ring{width:130px;height:130px}
+  .ring .dot{width:82px;height:82px}
+  .count strong{font-size:32px}
+  .cap-bar{gap:4px;padding:12px 10px}
+  .cap-tool em{font-size:10px}
+  .e-btn{padding:11px 18px}
+}
+@media (prefers-reduced-motion:reduce){
+  .ring .arc,.ring::after{animation:none}
+  *{transition:none !important}
+}
+</style>
+</head>
+<body>
+
+<!-- ================================================================
+     HOME
+================================================================ -->
+<div id="home">
+<aside class="sidebar">
+  <button class="collapse" aria-label="Collapse menu">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h15M3 16h15M14 4l5 4-5 4"/></svg>
+  </button>
+  <nav class="nav">
+    <a href="#" class="active" aria-current="page" aria-label="Home">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H10v6H4a1 1 0 0 1-1-1z"/></svg>
+    </a>
+    <a href="#" aria-label="Call history">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6h12M9 12h12M9 18h12M3 6h.01M3 12h.01M3 18h.01"/></svg>
+    </a>
+  </nav>
+</aside>
+
+<main class="shell">
+  <div class="topbar">
+    <div class="hello">Hello, Poulomi Kha</div>
+    <button class="kebab" aria-label="More options">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.9"/><circle cx="12" cy="12" r="1.9"/><circle cx="12" cy="19" r="1.9"/></svg>
+    </button>
+  </div>
+
+  <div class="grid">
+
+    <!-- left: stats + availability -->
+    <section>
+      <h2 class="sec">My Stats</h2>
+
+      <div class="last-outcome" id="lastOutcome" hidden>
+        <span class="lo-dot" id="loDot"></span>
+        <div class="lo-body">
+          <b id="loTitle">—</b>
+          <span class="lo-reason" id="loReason"></span>
+        </div>
+        <span class="lo-time" id="loTime"></span>
+      </div>
+
+      <div class="box">
+        <div class="head">Calls Completed: <b id="completed">0</b></div>
+        <div class="head">Calls Received: <b id="received">0</b></div>
+        <div class="stat-grid">
+          <p><b id="cAccepted">0</b><span>Accepted</span></p>
+          <p><b id="cMissed">0</b><span>Missed</span></p>
+          <p><b id="cDeclined">0</b><span>Declined</span></p>
+        </div>
+      </div>
+
+      <h2 class="sec" style="margin-top:30px">Availability</h2>
+      <div class="avail-empty" id="availEmpty">
+        <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="12" cy="13.5" r="7.5"/><path d="M12 10v3.5l2 1.5M9.5 2.5h5M4.5 6 6 4.5M3 21 21 3"/></svg>
+        <p>Toggle on to view your activity</p>
+      </div>
+      <div class="avail" id="availCard" hidden>
+        <div class="r"><span>Online Hours</span><span>Offline Hours</span></div>
+        <div class="v"><span id="onHours">0h 0m</span><span id="offHours">0h 0m</span></div>
+        <div class="bar"><i id="availBar"></i></div>
+        <div class="foot"><span>Refreshes every 5 minutes</span><span>Last Updated At: <span id="stamp">--:--</span></span></div>
+      </div>
+    </section>
+
+    <!-- centre: call banner + state illustration -->
+    <section>
+      <div class="banner" id="banner" hidden>
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15.5 5.5a5 5 0 0 1 3 3"/><path d="M14.8 2.4a8.2 8.2 0 0 1 6.8 6.8"/><path d="M8.6 4.1a1.6 1.6 0 0 1 1.6 1.4c.1.7.3 1.4.6 2a1.6 1.6 0 0 1-.4 1.7L9.2 10.4a13 13 0 0 0 4.8 4.8l1.2-1.2a1.6 1.6 0 0 1 1.7-.4c.6.3 1.3.5 2 .6a1.6 1.6 0 0 1 1.4 1.6v2.4a1.6 1.6 0 0 1-1.7 1.6A15.8 15.8 0 0 1 4.8 5.7a1.6 1.6 0 0 1 1.6-1.6z"/></svg>
+        <span class="t">Incoming Call</span>
+        <button class="pick" id="pick" aria-label="Answer call">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.32.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/></svg>
+        </button>
+      </div>
+
+      <div class="stage" id="stage">
+        <svg class="pair" viewBox="0 0 256 92" aria-hidden="true">
+          <g fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+            <!-- agent with headset -->
+            <rect x="20" y="11" width="38" height="40" rx="14"/>
+            <path d="M20 28c6-1 13-3 19-7 2 2 6 5 12 6"/>
+            <path d="M10 27C10 15 22 5 39 5s29 10 29 22"/>
+            <rect x="6" y="24" width="7" height="13" rx="3.5"/>
+            <rect x="64" y="24" width="7" height="13" rx="3.5"/>
+            <path d="M67.5 34c0 5-6.5 8.5-21 8.7"/>
+            <circle cx="42" cy="42" r="4.2" fill="currentColor" stroke="none"/>
+            <path d="M2.5 88V78c0-13 10-23 36.5-23S75 65 75 78v10"/>
+            <path d="M16.5 80v8M60.5 80v8"/>
+            <!-- customer -->
+            <rect x="199" y="11" width="38" height="40" rx="14"/>
+            <path d="M199 28c6-1 13-3 19-7 2 2 6 5 12 6"/>
+            <path d="M182 88V78c0-13 10-23 36-23s36 10 36 23v10"/>
+            <path d="M196 80v8M240 80v8"/>
+            <!-- connection: broken offline, solid online -->
+            <g class="link-off">
+              <path d="M85 68h27"/><path d="M119 73l12-10"/><path d="M148 68h27"/>
+            </g>
+            <g class="link-on"><path d="M85 68h90"/></g>
+          </g>
+        </svg>
+        <p class="stage-title">You are <span id="stageState">Offline</span></p>
+        <p class="stage-sub" id="stageSub">Use the toggle on the side to toggle status to Online.</p>
+      </div>
+    </section>
+
+    <!-- right: status + queue -->
+    <section>
+      <div class="panel">
+        <div class="status-row">
+          <span class="lbl">Status</span>
+          <span class="status-toggle">
+            <span class="state" id="stateText">Offline</span>
+            <span class="switch">
+              <input type="checkbox" id="status" aria-label="Toggle online status">
+              <span class="track"></span>
+              <svg class="tick" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+            </span>
+          </span>
+        </div>
+        <label class="qlabel" for="queue">Queue</label>
+        <select id="queue">
+          <option>My Room</option>
+          <option>Retail Onboarding</option>
+          <option>Priority Banking</option>
+        </select>
+      </div>
+    </section>
+
+  </div>
+</main>
+</div><!-- /#home -->
+
+<!-- ================================================================
+     SESSION
+================================================================ -->
+<div id="session" hidden>
+
+  <header class="s-top">
+    <div class="brand" aria-label="IDfy"><svg class="brand-mark" width="31" height="20" aria-hidden="true" viewBox="0 0 31 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g clip-path="url(#idfyClip)">
+<path d="M27.8841 18.4631C27.9601 18.4592 28.0746 18.4373 28.1497 18.4233C28.2602 18.4025 28.3679 18.3686 28.4706 18.3224C28.7484 18.1984 29.09 17.8988 29.222 17.4862C29.2647 17.3529 29.2879 17.214 29.2909 17.074C29.2916 17.044 29.2909 17.014 29.2909 16.9841C29.2909 16.4544 29.2909 15.9247 29.2909 15.395C29.2909 15.3619 29.292 15.3 29.2909 15.2669C29.2909 15.2669 29.2746 15.2766 29.2646 15.2827C29.245 15.2952 29.2246 15.3066 29.2036 15.3167C29.0268 15.4073 28.8411 15.4792 28.6496 15.5311C28.4775 15.579 28.3012 15.6104 28.1233 15.6248C28.0179 15.6339 27.9121 15.6374 27.8063 15.6352C27.3499 15.6229 26.9163 15.5206 26.5129 15.2998C26.0224 15.0308 25.517 14.5332 25.2583 13.9274C25.164 13.707 25.0987 13.4751 25.0642 13.2376C25.0403 13.0694 25.0287 12.8997 25.0295 12.7298L25.0109 10.7256L22.2025 10.7504C22.2025 12.2895 22.2025 14.0937 22.2025 15.633H20.7637V6.86896C20.7631 6.73238 20.7703 6.59589 20.7853 6.46016C20.8438 5.94876 21.025 5.48664 21.3407 5.08023C21.5259 4.84051 21.7461 4.63053 21.9938 4.4575C22.3076 4.23887 22.6643 4.09053 23.0397 4.02245C23.1897 3.99464 23.341 3.98225 23.4927 3.97246C23.5158 3.971 23.6001 3.9711 23.6231 3.97131L23.629 5.40967C23.581 5.41175 23.5033 5.41862 23.4561 5.42196C23.4169 5.42675 23.3775 5.43154 23.3386 5.43862C23.1095 5.48004 22.8955 5.58209 22.7185 5.73431C22.549 5.87752 22.4123 6.04677 22.3211 6.25122C22.2554 6.39715 22.2169 6.55401 22.2074 6.71398C22.2042 6.77043 22.2034 6.82719 22.2034 6.88375L22.2121 9.49309L26.4696 9.49382L26.4717 12.8371C26.4814 13.1514 26.5863 13.4291 26.7862 13.6704C26.9482 13.8655 27.1436 14.0152 27.3827 14.1032C27.5099 14.1511 27.6438 14.1783 27.7795 14.184C27.8985 14.1884 28.0171 14.1864 28.1352 14.1658C28.3613 14.127 28.5735 14.0301 28.7516 13.8846C28.8578 13.7993 28.9522 13.7002 29.0325 13.5899C29.2001 13.3598 29.2827 13.1003 29.292 12.8166C29.2936 12.7666 29.2926 12.7166 29.2926 12.6667C29.2926 11.6573 29.2926 10.518 29.2926 9.50861L30.7019 9.50236V16.6921C30.6997 16.8025 30.7005 17.5774 30.6458 17.8543C30.5538 18.2069 30.3829 18.4919 30.1608 18.7795C29.9841 19.0089 29.7752 19.2111 29.5407 19.3798C29.1785 19.6402 28.776 19.7979 28.3359 19.8606C28.2309 19.8755 28.1253 19.8814 28.02 19.8904C27.9841 19.8935 27.9218 19.8904 27.8857 19.8904L27.8841 18.4631Z" fill="#606060"/>
+<ellipse cx="10.0574" cy="10.1083" rx="8.99877" ry="9.04433" fill="white"/>
+<path d="M15.0611 9.17239C14.9124 8.56643 14.6031 8.05649 14.145 7.63842C13.8724 7.38959 13.5578 7.19204 13.216 7.05517C12.844 6.90519 12.4578 6.8254 12.0564 6.8252C11.6829 6.8252 11.1883 6.8252 10.8145 6.8252V12.865C11.2144 12.865 11.7069 12.865 12.1068 12.865C12.2258 12.8641 12.3446 12.8548 12.4623 12.8372C12.8931 12.7764 13.2966 12.6361 13.6681 12.4073C14.2378 12.0563 14.6601 11.575 14.9198 10.9533C15.0359 10.6769 15.1067 10.3832 15.1294 10.0839C15.1355 10.0044 15.1408 9.92448 15.1418 9.84439C15.1425 9.7846 15.1351 9.72482 15.1328 9.66493C15.1255 9.49872 15.1015 9.33369 15.0611 9.17239Z" fill="#CE1417"/>
+<path d="M9.92333 0C4.44368 0 0.00195312 4.47713 0.00195312 9.99995C0.00195312 15.5228 4.44399 19.9999 9.92364 19.9999C15.4033 19.9999 19.8453 15.5228 19.8453 9.99995C19.8453 4.47713 15.4029 0 9.92333 0ZM6.25724 15.6464H3.45216V6.67944C3.45216 5.22713 4.61987 4.04989 6.06121 4.04989H6.25755L6.25724 15.6464ZM17.8951 10.4069C17.8757 10.5991 17.8473 10.7901 17.8098 10.9797C17.7489 11.2832 17.6632 11.581 17.5535 11.8702C17.3333 12.4535 17.02 12.9966 16.626 13.478C15.8232 14.4606 14.7297 15.1586 13.5052 15.4701C13.3196 15.518 13.1316 15.556 12.942 15.584C12.8276 15.6006 12.713 15.6144 12.598 15.6265C12.4959 15.6369 12.3936 15.6384 12.2916 15.6463C12.1033 15.6609 11.9149 15.6573 11.7266 15.6574C10.5397 15.6574 9.21805 15.6574 8.03123 15.6574L8.04322 6.42489C8.06451 6.18244 8.12019 5.94432 8.20856 5.7178C8.35176 5.34873 8.5754 5.0168 8.86295 4.74654C9.15051 4.47627 9.49463 4.27457 9.8699 4.15633C10.0404 4.1027 10.2159 4.067 10.3937 4.04978C10.4857 4.04072 10.5784 4.03625 10.6709 4.03593C11.1171 4.03458 11.5634 4.03385 12.0097 4.03593C12.1948 4.0369 12.3796 4.04555 12.5642 4.06187C13.8221 4.17171 15.0123 4.68326 15.9617 5.52209C16.4481 5.95052 16.8598 6.45803 17.1797 7.02356C17.4622 7.52152 17.6682 8.05975 17.7906 8.61992C17.8437 8.86045 17.8807 9.1043 17.9015 9.34982C17.9178 9.54886 17.9313 9.74852 17.923 9.9485C17.9168 10.1013 17.9102 10.2543 17.8951 10.4069Z" fill="#CE1417"/>
+</g>
+<defs>
+<clipPath id="idfyClip">
+<rect width="30.7017" height="20" fill="white"/>
+</clipPath>
+</defs>
+</svg></div>
+    <div class="dur">Call Duration: <span id="dur">00:00</span></div>
+
+    <div class="s-mid">
+      <span class="s-lbl">Video Preview</span>
+      <span class="onoff">
+        <input type="checkbox" id="preview" checked aria-label="Video preview">
+        <span class="onoff-track"><i class="knob"></i><em>ON</em></span>
+      </span>
+    </div>
+
+    <div class="s-right">
+      <button class="linky" id="markOffline">Mark me offline after this call</button>
+      <span class="switch">
+        <input type="checkbox" id="avail" checked aria-label="Available for calls">
+        <span class="track"></span>
+        <svg class="tick" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+      </span>
+      <span class="s-lbl" id="availTxt">Available for calls</span>
+    </div>
+  </header>
+
+  <div class="cam-banner" id="camBanner" hidden>
+    <div class="cb-main">
+      <strong id="cbTitle">Camera blocked</strong>
+      <p id="cbWhy"></p>
+      <p class="cb-fix" id="cbFix"></p>
+      <ul class="cb-diag" id="cbDiag"></ul>
+    </div>
+    <div class="cb-acts">
+      <button class="cb-btn" id="cbRetry">Request camera</button>
+      <button class="cb-btn ghost" id="cbClose">Dismiss</button>
+    </div>
+  </div>
+
+  <div class="s-body">
+
+    <!-- video -->
+    <div class="vid-col">
+      <div class="stage-vid">
+        <div class="feed" id="custFeed">
+          <video id="custVideo" autoplay muted playsinline></video>
+          <div class="ph">
+            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><circle cx="12" cy="8.5" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
+            <p>Customer camera</p>
+          </div>
+        </div>
+
+        <span class="tag tl">C</span>
+        <div class="net tr">
+          <div class="pills">
+            <span class="pill blue" title="Speaking"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="9" width="2.6" height="6" rx="1.3"/><rect x="10.7" y="5" width="2.6" height="14" rx="1.3"/><rect x="17.4" y="9" width="2.6" height="6" rx="1.3"/></svg></span>
+            <span class="pill ghost" title="Headset"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 14v-2a8 8 0 0 1 16 0v2"/><rect x="2.5" y="13" width="4" height="7" rx="2"/><rect x="17.5" y="13" width="4" height="7" rx="2"/></svg></span>
+          </div>
+          <div class="rates">
+            <span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 4v15M6 13l6 6 6-6"/></svg><b id="dn1">264</b><small>kb/s</small></span>
+            <span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 20V5M6 11l6-6 6 6"/></svg><b id="up1">216</b><small>kb/s</small></span>
+          </div>
+        </div>
+
+        <div class="pip" id="pip">
+          <video id="selfVideo" autoplay muted playsinline></video>
+          <div class="ph small" id="selfPh">
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="12" cy="8.5" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
+            <button class="cam-start" id="camStart">Start my camera</button>
+            <p class="cam-err" id="camErr"></p>
+          </div>
+          <span class="tag pip-tag">A</span>
+          <div class="net pip-net">
+            <div class="rates">
+              <span><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 4v15M6 13l6 6 6-6"/></svg><b id="dn2">212</b><small>kb/s</small></span>
+              <span><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 20V5M6 11l6-6 6 6"/></svg><b id="up2">229</b><small>kb/s</small></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="vid-bar">
+        <button class="rnd" id="micBtn" aria-pressed="true" aria-label="Mute microphone">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 15a3.5 3.5 0 0 0 3.5-3.5V6a3.5 3.5 0 0 0-7 0v5.5A3.5 3.5 0 0 0 12 15z"/><path d="M18 11.5a6 6 0 0 1-12 0H4a8 8 0 0 0 7 7.9V22h2v-2.6a8 8 0 0 0 7-7.9z"/></svg>
+        </button>
+        <button class="rnd" id="camBtn" aria-pressed="true" aria-label="Turn off camera">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M4 6h9a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z"/><path d="M16.5 12l4.3-3.2A.8.8 0 0 1 22 9.4v5.2a.8.8 0 0 1-1.2.6L16.5 12z"/></svg>
+        </button>
+        <label class="cam-pick" id="camPick" hidden>
+          <span>Camera</span>
+          <select id="camSelect" aria-label="Select camera"></select>
+        </label>
+        <button class="reconnect" id="reconnect">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 12a8 8 0 0 1 13.6-5.7L20 8"/><path d="M20 4v4.5h-4.5"/><path d="M20 12a8 8 0 0 1-13.6 5.7L4 16"/><path d="M4 20v-4.5h4.5"/></svg>
+          Reconnect
+        </button>
+      </div>
+    </div>
+
+    <!-- step rail (populated by JS) -->
+    <nav class="rail" id="rail" aria-label="Verification steps"></nav>
+
+    <!-- tasks (populated by JS) -->
+    <div class="task-pane">
+      <div class="tasks" id="tasks"></div>
+      <div class="verdict-bar">
+        <button class="final amber" id="vUnable">Unable to Verify</button>
+        <button class="final red" id="vReject">Rejected</button>
+        <button class="final green" id="vVerify" disabled>Verified</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- reason for rejection / unable to verify -->
+  <div class="cap-overlay" id="reasonModal" hidden>
+    <div class="reason-box">
+      <h3 id="reasonTitle">Reason for rejection</h3>
+      <p class="reason-sub">This is recorded against the case and shown to the reviewer.</p>
+      <label class="reason-field">
+        <span>Reason</span>
+        <select id="reasonSelect"></select>
+      </label>
+      <label class="reason-field">
+        <span>Note <em>optional</em></span>
+        <input type="text" id="reasonNote" placeholder="Add any detail the reviewer needs">
+      </label>
+      <div class="reason-acts">
+        <button class="e-btn ghost" id="reasonCancel">CANCEL</button>
+        <button class="e-btn solid" id="reasonConfirm" disabled>CONFIRM</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- full-size image viewer -->
+  <div class="cap-overlay" id="viewModal" hidden>
+    <div class="view-box">
+      <button class="cap-x" id="viewClose" aria-label="Close">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
+      </button>
+      <h3 id="viewTitle">Captured image</h3>
+      <div class="view-stage"><img id="viewImg" alt="Captured image"></div>
+      <div class="view-acts">
+        <button class="e-btn ghost" id="viewRecap">RECAPTURE</button>
+        <button class="e-btn solid" id="viewDone">CLOSE</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- image capture (live framing) -->
+  <div class="cap-overlay" id="capModal" hidden>
+    <div class="cap-box">
+      <button class="cap-x" id="capClose" aria-label="Close">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
+      </button>
+      <h3 id="capTitle">Image Capture</h3>
+      <div class="cap-stage">
+        <video id="capVideo" autoplay muted playsinline></video>
+        <div class="cap-frame" id="capFrame"></div>
+      </div>
+      <div class="cap-bar">
+        <button class="cap-tool" id="capSwitch">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h13l-3-3M20 16H7l3 3"/></svg>
+          <em>Switch Customer's Camera</em>
+        </button>
+        <button class="shutter" id="capShoot" aria-label="Capture"></button>
+        <button class="cap-tool" id="capHd" aria-pressed="false">
+          <span class="hd">HD</span>
+          <em>High Resolution</em>
+        </button>
+        <button class="cap-tool" id="capFrameBtn" aria-pressed="true">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 8V5h3M20 8V5h-3M4 16v3h3M20 16v3h-3"/></svg>
+          <em>Frame</em>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- edit screenshot -->
+  <div class="cap-overlay" id="editModal" hidden>
+    <div class="edit-box">
+      <h3>Edit Screenshot</h3>
+      <div class="edit-stage" id="editStage">
+        <canvas id="editCanvas"></canvas>
+        <div class="crop-rect" id="cropRect" hidden><i class="crop-h"></i></div>
+      </div>
+      <div class="edit-bar">
+        <button class="edit-tool" data-act="rotate">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M4 12a8 8 0 1 0 8-8"/><path d="M12 1.5 8.5 4 12 6.5z" fill="currentColor" stroke="none"/></svg>
+          <em>Rotate</em>
+        </button>
+        <button class="edit-tool" data-act="mirror">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"><path d="M12 2v20"/><path d="M9 8 4 17h5z" fill="currentColor" stroke="none"/><path d="M15 8v9h5z"/></svg>
+          <em>Mirror</em>
+        </button>
+        <button class="edit-tool" data-act="crop" id="cropBtn">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M7 3v14h14M3 7h14v14"/></svg>
+          <em>Crop</em>
+        </button>
+        <button class="edit-tool" data-act="reset">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 4v4.5h-4.5"/></svg>
+          <em>Reset</em>
+        </button>
+        <span class="zooms">
+          <button class="edit-tool" data-act="zoomout" aria-label="Zoom out">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5 21 21M7.5 10.5h6"/></svg>
+          </button>
+          <button class="edit-tool" data-act="zoomin" aria-label="Zoom in">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5 21 21M7.5 10.5h6M10.5 7.5v6"/></svg>
+          </button>
+        </span>
+      </div>
+      <label class="front-opt">
+        <input type="checkbox" id="switchFront" checked>
+        <span>Switch to front camera after clicking submit</span>
+      </label>
+      <div class="edit-acts">
+        <button class="e-btn ghost" id="reCapture">RECAPTURE</button>
+        <button class="e-btn solid" id="submitShot">SUBMIT</button>
+      </div>
+    </div>
+  </div>
+
+  <button class="chat-fab" aria-label="Open chat">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 21l1.9-5.4A8 8 0 1 1 21 12z"/><path d="M9 12h.01M12 12h.01M15 12h.01"/></svg>
+  </button>
+</div><!-- /#session -->
+
+<!-- incoming call modal -->
+<div class="overlay" id="overlay" role="dialog" aria-modal="true" aria-labelledby="mTitle">
+  <div class="modal">
+    <div class="ring">
+      <svg class="arc" viewBox="0 0 100 100" aria-hidden="true">
+        <circle cx="50" cy="50" r="45" fill="none" stroke="#25379f" stroke-width="8" stroke-linecap="round" stroke-dasharray="52 283"/>
+      </svg>
+      <div class="dot">
+        <svg width="52" height="52" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.32.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/></svg>
+      </div>
+    </div>
+    <h3 id="mTitle">Incoming Call</h3>
+    <div class="count">
+      <span>Call will be auto-accepted in</span>
+      <strong id="secs">9<i>s</i></strong>
+    </div>
+    <button class="accept" id="accept">Accept</button>
+    <div class="warn" id="warn">Ringtone blocked by the browser. Click anywhere on the page, then try again.</div>
+  </div>
+</div>
+
+<script src="../svc-config.js"></script>
+<script>
+"use strict";
+/* ================================================================
+   0. Small helpers
+================================================================ */
+const el  = id => document.getElementById(id);
+const all = sel => [...document.querySelectorAll(sel)];
+const clock12 = (d = new Date(), withSecs = false) =>
+  d.toLocaleTimeString([], withSecs
+    ? {hour:'2-digit', minute:'2-digit', second:'2-digit'}
+    : {hour:'2-digit', minute:'2-digit'});
+
+/* ================================================================
+   1. Icons — one place, so markup stays readable
+================================================================ */
+const ICON = {
+  user:`<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0z"/></svg>`,
+  copy:`<svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="8.5" y="8.5" width="12" height="12" rx="2.8"/><path d="M6 3h8.5a3 3 0 0 1 3 3v1.1h-2.2V6.3a1.1 1.1 0 0 0-1.1-1.1H6.3a1.1 1.1 0 0 0-1.1 1.1v8.9a1.1 1.1 0 0 0 1.1 1.1h1.1v2.2H6a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3z"/></svg>`,
+  headset:`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 14v-2.5a8 8 0 0 1 16 0V14"/><rect x="2.5" y="13" width="4" height="6.5" rx="2"/><rect x="17.5" y="13" width="4" height="6.5" rx="2"/><path d="M20 19.5c0 1.4-1.6 2.5-4 2.5"/></svg>`,
+  refresh:`<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 4v4.5h-4.5"/></svg>`,
+  camera:`<svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M4 7h2.2L7.5 5h9l1.3 2H20a1.5 1.5 0 0 1 1.5 1.5v9A1.5 1.5 0 0 1 20 19H4a1.5 1.5 0 0 1-1.5-1.5v-9A1.5 1.5 0 0 1 4 7z"/><circle cx="12" cy="13" r="3.2" fill="#eef1f7"/></svg>`,
+  sign:`<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 16.8c2.3.5 3.3-.4 4-2 .7-1.9 1.1-5.5 2.2-7.9.5-1.2 1.5-1.4 1.8-.3.5 1.5-.4 5-1.1 7.5-.5 1.8-1.3 3.3-2.1 3.2-1.1-.1-.8-1.8.5-2.7 1.7-1.3 4.6-1.9 7.1-1.6 1.6.2 2.9.7 4.2 1.5"/></svg>`,
+  trash:`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg>`,
+  tickCircle:`<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="12" r="11"/><path d="M17.2 9 10.6 15.6 6.9 12l1.4-1.4 2.3 2.3 5.2-5.2z" fill="#fff"/></svg>`,
+  cameraSm:`<svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M4 7h2.2L7.5 5h9l1.3 2H20a1.5 1.5 0 0 1 1.5 1.5v9A1.5 1.5 0 0 1 20 19H4a1.5 1.5 0 0 1-1.5-1.5v-9A1.5 1.5 0 0 1 4 7z"/><circle cx="12" cy="13" r="3.2" fill="#fff"/></svg>`,
+  tickFilled:`<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M17 9.2 10.8 15.4 7.4 12l1.3-1.3 2.1 2.1 4.9-4.9z" fill="#fff"/></svg>`
+};
+
+/* ================================================================
+   2. Task markup — built from templates so the repeated pieces
+      (remarks, verdict pairs, rows) exist exactly once.
+================================================================ */
+const remark = label => `
+  <div class="remark">
+    <span class="av">${ICON.headset}</span>
+    <input type="text" placeholder="Add your remarks here" aria-label="Remarks — ${label}">
+  </div>`;
+
+// PASS / FAIL pair. Locked (disabled) until the action it grades has run.
+const acts = (item, {sm = false, open = false} = {}) => {
+  const k = sm ? ' sm' : '';
+  const d = open ? '' : ' disabled';
+  return `
+  <div class="t-actions">
+    <button class="verdict pass${k}" data-item="${item}" data-val="PASS"${d}>PASS</button>
+    <button class="verdict fail${k}" data-item="${item}" data-val="FAIL"${d}>FAIL</button>
+  </div>`;
+};
+
+const row = ({item, label, pill, outId, out = 'Not run', btnId, btn, graded = true}) => `
+  <div class="row-item"${item ? ` data-item="${item}"` : ''}>
+    <span class="row-lbl">${label}${pill ? ` <em class="src-pill"${pill.id ? ` id="${pill.id}"` : ''}>${pill.text}</em>` : ''}</span>
+    ${outId ? `<span class="row-out" id="${outId}">${out}</span>` : ''}
+    ${btn ? `<button class="chip" id="${btnId}"${btn.rerun ? ` data-rerun="${btn.rerun}"` : ''} disabled>${btn.label}</button>` : ''}
+    ${item && graded ? acts(item, {sm:true}) : ''}
+  </div>`;
+
+const captureTile = ({wrapId, tileId, item, label, icon, pan}) => `
+  <div class="shot-wrap${pan ? ' pan-wrap' : ''}" id="${wrapId}">
+    <button class="shot${pan ? ' pan' : ''}" id="${tileId}" data-item="${item}">
+      <span class="lens">${icon}</span>
+      <em>${label}</em>
+    </button>
+    <button class="shot-del" data-del="${tileId}" hidden aria-label="Remove ${label.toLowerCase()}">${ICON.trash}</button>
+  </div>`;
+
+const receivedPanel = (id, timeId, tileId) => `
+  <div class="received" id="${id}" hidden>
+    <span class="rcv-time" id="${timeId}">—</span>
+    <div class="rcv-acts">
+      <button class="chip-sm solid" data-view="${tileId}">View</button>
+      <button class="chip-sm" data-recap="${tileId}">Recapture</button>
+    </div>
+  </div>`;
+
+const ocrRow = label =>
+  `<p><b>${label}</b><input class="ocr-field" readonly aria-label="${label}"></p>`;
+
+const cap1 = k => k[0].toUpperCase() + k.slice(1);
+
+// One document block: journey image, extraction + OCR correction, name match, registry lookup.
+const docGroup = ({name, key, fields, dbLabel, dbPill, items}) => `
+  <div class="doc-group">
+    <h5 class="doc-title">${name}</h5>
+    <div class="rows">
+      <div class="row-item">
+        <span class="row-lbl">Image obtained during journey</span>
+        <span class="row-out" id="${key}JourneyTime">—</span>
+        <button class="chip-sm solid" id="view${cap1(key)}Journey" disabled>View</button>
+        <button class="chip-sm" data-recapdoc="${key}">Recapture</button>
+      </div>
+      <div class="row-item" data-item="${items.extract}">
+        <span class="row-lbl">Extraction</span>
+        <button class="chip" id="${key}ExtractBtn" disabled>Extract</button>
+        ${acts(items.extract, {sm:true})}
+      </div>
+      <div class="extract-out" id="${key}ExtractOut" hidden>
+        ${fields.map(ocrRow).join('')}
+        <div class="ocr-bar">
+          <span class="row-out" id="${key}OcrOut">Correct any mis-read field</span>
+          <button class="chip" id="${key}OcrBtn" data-editing="false" disabled>OCR Edit</button>
+        </div>
+      </div>
+      ${row({item:items.name, label:'Name match', outId:`${key}NameOut`, btnId:`${key}NameBtn`, btn:{label:'Match'}})}
+      ${row({item:items.db, label:dbLabel, pill:dbPill && {text:dbPill}, outId:`${key}DbOut`, btnId:`${key}DbBtn`, btn:{label:'Check'}})}
+    </div>
+    ${remark(`${name} validation`)}
+  </div>`;
+
+const question = ({item, text, expected, label}) => `
+  <div class="qblock" data-item="${item}">
+    <div class="qtext">
+      <p>${text}</p>
+      <span class="expect"><i>Expected Answer</i> - <b>${expected}</b></span>
+    </div>
+    ${remark(label)}
+    ${acts(item, {sm:true, open:true})}
+  </div>`;
+
+const head = (num, title, extra = '') => `
+  <div class="t-head">
+    <span class="num${num === 0 ? ' icon' : ''}">${num === 0 ? ICON.user : num}</span>
+    <h4>${title}</h4>
+    ${extra}
+  </div>`;
+
+function taskMarkup(){
+  return `
+  <section class="task info" id="t0">
+    ${head(0, "CUSTOMER'S INFO")}
+    <div class="kv">
+      <p><b>Reference ID:</b> <span>68264ad5….535d9366f6ed</span>
+        <button class="copy" data-copy="68264ad5-0000-0000-0000-535d9366f6ed" aria-label="Copy reference ID">${ICON.copy}</button></p>
+      <p><b>Profile ID:</b> <span>2bb6a8a5….62a1c5b534ac</span>
+        <button class="copy" data-copy="2bb6a8a5-0000-0000-0000-62a1c5b534ac" aria-label="Copy profile ID">${ICON.copy}</button></p>
+      <p class="span2"><b>Country:</b> <span>India</span></p>
+    </div>
+    <p class="eyebrow">IP CHECK</p>
+    <div class="kv">
+      <p><b>IP address:</b> <span id="ipAddr">49.36.182.114</span></p>
+      <p><b>VPN / proxy:</b> <span class="ip-flag ok" id="ipVpn">Not detected</span></p>
+    </div>
+  </section>
+
+  <section class="task" id="t1">
+    ${head(1, "CUSTOMER'S SELECTION")}
+    <div class="t-card tight">
+      <p class="line"><b>Customer's Selection from journey:</b> <span>PAN, Selfie</span></p>
+    </div>
+  </section>
+
+  <section class="task" id="t2">
+    ${head(2, `LOCATION CHECK<span class="rem clear fetched">Fetch Completed Successfully${ICON.tickFilled}</span>`)}
+    <div class="t-card">
+      <p class="line"><b>Latitude:</b> <span>19.10427</span><span class="sep">·</span><b>Longitude:</b> <span>72.886307</span></p>
+      <p class="line"><b>Source:</b> <span>GPS</span></p>
+      <p class="line"><b>Street Address:</b> <span>Skyline Icon, 804, Andheri – Kurla Rd, Chimatpada, Marol, Andheri East, Mumbai, Maharashtra 400059</span></p>
+    </div>
+  </section>
+
+  <section class="task" id="t3">
+    ${head(3, 'RANDOM NUMBER CHECK &amp; LIVELINESS CHECK', '<span class="rem" id="rem3"></span>')}
+    <div class="t-card">
+      <p class="note">Generate a random number and ask the customer to speak the digits out loud.</p>
+      <div class="code-field">
+        <input type="text" id="code" inputmode="numeric" maxlength="4" pattern="[0-9]*"
+               placeholder="Enter digits spoken" aria-label="Digits the customer spoke">
+        <button class="linky gen-btn" id="genCode">${ICON.refresh} Generate code</button>
+      </div>
+      ${remark('random number check')}
+      ${acts('3-1')}
+    </div>
+  </section>
+
+  <section class="task" id="t4">
+    ${head(4, 'SELFIE CAPTURE', '<span class="rem" id="rem4"></span>')}
+    <div class="t-card">
+      <div class="cap-panel">
+        <button class="cap-preview" id="journeyBox" disabled aria-label="View the selfie full size">
+          <img id="journeySelfie" alt="Selfie on file for this customer">
+          <span class="cap-empty"><span class="lens">${ICON.camera}</span><em>Selfie Screenshot</em></span>
+        </button>
+        <div class="cap-side">
+          <p class="cap-status empty" id="selfieStatus">${ICON.tickCircle}<em>No selfie received</em></p>
+          <span class="rcv-time" id="journeyTime">—</span>
+          <div class="cap-ctas">
+            <button class="cta solid" id="recapSelfie">${ICON.cameraSm} RECAPTURE</button>
+            <button class="cta ghost" id="delSelfie" disabled>${ICON.trash} DELETE</button>
+          </div>
+        </div>
+      </div>
+      <div class="rows">
+        ${row({item:'4-3', label:'Face match with PAN photo', pill:{id:'m2Src', text:'Pre journey'}, outId:'m2Out', out:'Not run', btnId:'m2Btn', btn:{label:'Re-match', rerun:'Re-match'}})}
+        ${row({item:'4-4', label:'Face match with Aadhaar photo', pill:{id:'m3Src', text:'Pre journey'}, outId:'m3Out', out:'Not run', btnId:'m3Btn', btn:{label:'Re-match', rerun:'Re-match'}})}
+        ${row({item:'4-5', label:'Deepfake detection', outId:'dfOut', out:'Not run', btnId:'dfBtn', btn:{label:'Re-run', rerun:'Re-run'}})}
+      </div>
+      ${remark('selfie capture')}
+    </div>
+  </section>
+
+  <section class="task" id="t5">
+    ${head(5, 'DOCUMENT VALIDATION', '<span class="rem" id="rem5"></span>')}
+    <div class="t-card">
+      ${docGroup({name:'PAN', key:'pan', fields:['PAN number','Name','Date of birth'],
+                  dbLabel:'PAN DB check', dbPill:'NSDL',
+                  items:{extract:'5-1', name:'5-2', db:'5-5'}})}
+      ${docGroup({name:'Aadhaar', key:'aad', fields:['Aadhaar number','Name','Date of birth','Address'],
+                  dbLabel:'PAN Aadhaar seeding status',
+                  items:{extract:'5-3', name:'5-4', db:'5-6'}})}
+    </div>
+  </section>
+
+  <section class="task" id="t6">
+    ${head(6, 'SECURITY QUESTIONS', '<span class="rem" id="rem6"></span>')}
+    <div class="t-card">
+      <div class="rows">
+        ${question({item:'6-1', text:'Are you salaried or self employed?', expected:'Salaried', label:'employment type'})}
+        ${question({item:'6-2', text:'What is your income range?', expected:'15 Lacs - 25 Lacs', label:'income range'})}
+      </div>
+    </div>
+  </section>
+
+  <section class="task" id="t7">
+    ${head(7, 'SIGNATURE CAPTURE', '<span class="rem" id="rem7"></span>')}
+    <div class="t-card">
+      ${captureTile({wrapId:'wrapSig', tileId:'sigShot', item:'7-1', label:'Signature Screenshot', icon:ICON.sign, pan:true})}
+      ${receivedPanel('rcvSig', 'rcvSigTime', 'sigShot')}
+      <div class="rows">
+        ${row({item:'7-2', label:'Signature match against PAN', outId:'sigMatchOut', btnId:'sigMatchBtn', btn:{label:'Match'}})}
+      </div>
+      ${remark('signature')}
+    </div>
+  </section>
+
+  <div class="tasks-pad"></div>`;
+}
+
+el('tasks').innerHTML = taskMarkup();
+
+/* rail: one button per task section, 0 rendered as an avatar */
+el('rail').innerHTML = [0,1,2,3,4,5,6,7].map(n =>
+  `<button class="step${n <= 2 ? ' done' : ''}" data-step="${n}"${n === 0 ? ' aria-label="Customer details"' : ''}>${n === 0 ? ICON.user : n}</button>`
+).join('');
+
+all('.rail .step').forEach(st => st.addEventListener('click', () => {
+  el('t' + st.dataset.step)?.scrollIntoView({behavior:'smooth', block:'start'});
+}));
+
+/* ================================================================
+   3. Ringtone — synthesized, so no audio file has to be hosted.
+      Swap the internals for an <audio loop> and keep unlock/start/stop.
+================================================================ */
+const Ringtone = (() => {
+  let ctx, master, timer, playing = false, volume = .45, enabled = true, dead = false;
+
+  function ensure(){
+    if (ctx || dead) return;
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC){ dead = true; return; }
+    try {
+      ctx = new AC();
+      master = ctx.createGain();
+      master.gain.value = volume;
+      master.connect(ctx.destination);
+    } catch { dead = true; }
+  }
+
+  // Must run inside a real user gesture or the context stays suspended.
+  async function unlock(){
+    ensure();
+    if (!ctx) return false;
+    if (ctx.state === 'suspended') await ctx.resume();
+    return ctx.state === 'running';
+  }
+
+  // One bell strike: fundamental plus a quiet third harmonic, plucked decay.
+  function chime(at, f){
+    [[f, .55, 1.9], [f * 3, .12, 1.1]].forEach(([freq, peak, len]) => {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = 'triangle';
+      o.frequency.value = freq;
+      g.gain.setValueAtTime(0, at);
+      g.gain.linearRampToValueAtTime(peak, at + .012);
+      g.gain.exponentialRampToValueAtTime(.0001, at + len);
+      o.connect(g).connect(master);
+      o.start(at); o.stop(at + len + .05);
+    });
+  }
+
+  // Two descending pairs, then a rest — reads as a ring without being shrill.
+  function burst(){
+    const t = ctx.currentTime + .02;
+    chime(t, 783.99); chime(t + .40, 587.33);
+    chime(t + 1.05, 783.99); chime(t + 1.45, 587.33);
+  }
+
+  return {
+    unlock,
+    start(){
+      if (!enabled || playing || !ctx || ctx.state !== 'running') return false;
+      playing = true; burst(); timer = setInterval(burst, 3400);
+      return true;
+    },
+    stop(){ playing = false; clearInterval(timer); timer = null; },
+    setVolume(v){ volume = v; if (master) master.gain.value = v; },
+    setEnabled(on){ enabled = on; if (!on) this.stop(); }
+  };
+})();
+
+/* ================================================================
+   4. Home screen: status, queue, incoming call
+================================================================ */
+const AUTO_ACCEPT = 9;
+const RING_DELAY  = 4000;    // stands in for the queue pushing a call
+
+let online = false, countdown = null, incoming = null;
+let received = 0, completed = 0, markOff = false;
+const recv   = {accepted:0, missed:0, declined:0};
+const tally  = {verified:0, rejected:0, unable:0};
+
+const STAGE_COPY = {
+  offline: ['Offline', 'Use the toggle on the side to toggle status to Online.'],
+  online:  ['Online',  'You are ready to receive calls.'],
+  ringing: ['Online',  'A customer is waiting — accept the call to start the session.'],
+  session: ['Online',  'Session in progress.']
+};
+
+function setStage(mode){
+  el('stage').classList.toggle('online', mode !== 'offline');
+  el('banner').hidden = mode !== 'ringing';
+  const [state, sub] = STAGE_COPY[mode] || STAGE_COPY.offline;
+  el('stageState').textContent = state;
+  el('stageSub').textContent = sub;
+}
+
+function paintRecv(){
+  el('cAccepted').textContent = recv.accepted;
+  el('cMissed').textContent   = recv.missed;
+  el('cDeclined').textContent = recv.declined;
+}
+
+function queueNextCall(){
+  clearTimeout(incoming);
+  if (RTC.connected) return RTC.next();          // real customers ring from the hub
+  // No signaling hub (e.g. opened from file://) — keep the simulated queue.
+  incoming = setTimeout(() => {
+    if (!online || countdown) return;
+    RTC.connected ? RTC.next() : openCall();
+  }, RING_DELAY);
+}
+
+function openCall(){
+  received++;
+  el('received').textContent = received;
+
+  el('overlay').classList.add('show');
+  el('warn').classList.toggle('show', !Ringtone.start());
+  el('accept').focus();
+
+  let left = AUTO_ACCEPT;
+  el('secs').innerHTML = left + '<i>s</i>';
+  setStage('ringing');
+
+  countdown = setInterval(() => {
+    left--;
+    el('secs').innerHTML = Math.max(left, 0) + '<i>s</i>';
+    if (left <= 0) endCall('auto');
+  }, 1000);
+}
+
+// Single exit path for every outcome: Accept, auto-accept, Esc, going offline,
+// or the customer leaving the queue / another agent taking the call.
+async function endCall(reason){
+  clearInterval(countdown); countdown = null;
+  Ringtone.stop();
+  el('overlay').classList.remove('show');
+
+  if (reason === 'accepted' || reason === 'auto'){
+    // Live customer: claim the call on the hub first — another agent may have won it.
+    if (RTC.ringing && !(await RTC.accept())) reason = 'cancelled';
+  } else if (reason === 'declined' || reason === 'offline'){
+    RTC.decline();
+  }
+
+  if (reason === 'accepted' || reason === 'auto') recv.accepted++;
+  else if (reason === 'declined') recv.declined++;
+  else if (reason === 'offline' || reason === 'cancelled') recv.missed++;
+  paintRecv();
+
+  if (reason === 'accepted' || reason === 'auto'){
+    setStage('session');
+    openSession();
+  } else {
+    setStage(online ? 'online' : 'offline');
+    if (online) queueNextCall();
+  }
+}
+
+el('status').addEventListener('change', async e => {
+  online = e.target.checked;
+  el('stateText').textContent = online ? 'Online' : 'Offline';
+  el('stateText').classList.toggle('on', online);
+
+  if (online){
+    setStage('online');
+    el('availEmpty').hidden = true;
+    el('availCard').hidden = false;
+    startClock();
+    RTC.connect();
+    queueNextCall();
+    await Ringtone.unlock();          // this gesture is what unlocks audio for later
+  } else {
+    clearTimeout(incoming);
+    if (countdown) endCall('offline');
+    RTC.disconnect();
+    setStage('offline');
+    el('availEmpty').hidden = false;
+    el('availCard').hidden = true;
+    stopClock();
+  }
+});
+
+el('pick').addEventListener('click', () => { if (countdown) endCall('accepted'); });
+el('accept').addEventListener('click', () => endCall('accepted'));
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && countdown) endCall('declined'); });
+
+/* ---- online-hours ticker ---- */
+let clock = null, onlineSecs = 0;
+function startClock(){
+  if (clock) return;
+  clock = setInterval(() => {
+    onlineSecs++;
+    el('onHours').textContent = `${Math.floor(onlineSecs / 3600)}h ${Math.floor(onlineSecs % 3600 / 60)}m`;
+    el('availBar').style.width = Math.min(onlineSecs / 3600 * 100, 100) + '%';
+    el('stamp').textContent = clock12();
+  }, 1000);
+}
+function stopClock(){ clearInterval(clock); clock = null; }
+
+/* ================================================================
+   5. Outcome of a session
+================================================================ */
+const REASONS = {
+  rejected: {
+    title: 'Reason for rejection',
+    list: ['Face mismatch with document', 'Name mismatch with application',
+           'Document tampered or forged', 'Customer is not the account holder',
+           'Customer refused to continue', 'Fraud suspected', 'Other']
+  },
+  unable: {
+    title: 'Reason unable to verify',
+    list: ['Poor network — call dropped', 'Video or lighting quality too poor',
+           'Document not available with customer', 'Customer could not hear or respond',
+           'Language barrier', 'Customer requested a callback',
+           'Technical issue at agent end', 'Other']
+  }
+};
+const OUTCOME = {
+  verified: {label:'Verified',         dot:'verified'},
+  rejected: {label:'Rejected',         dot:'rejected'},
+  unable:   {label:'Unable to Verify', dot:'unable'}
+};
+
+let pendingOutcome = null;
+
+function askReason(outcome){
+  pendingOutcome = outcome;
+  const cfg = REASONS[outcome];
+  el('reasonTitle').textContent = cfg.title;
+  el('reasonSelect').innerHTML =
+    '<option value="" selected disabled>Select a reason</option>' +
+    cfg.list.map(r => `<option>${r}</option>`).join('');
+  el('reasonNote').value = '';
+  el('reasonConfirm').disabled = true;
+  el('reasonModal').hidden = false;
+  el('reasonSelect').focus();
+}
+
+function closeReason(){
+  el('reasonModal').hidden = true;
+  pendingOutcome = null;                 // cancelling keeps the agent in the call
+}
+
+el('reasonSelect').addEventListener('change', e => { el('reasonConfirm').disabled = !e.target.value; });
+el('reasonCancel').addEventListener('click', closeReason);
+el('reasonConfirm').addEventListener('click', () => {
+  const reason = el('reasonSelect').value, note = el('reasonNote').value.trim();
+  const outcome = pendingOutcome;
+  el('reasonModal').hidden = true;
+  pendingOutcome = null;
+  finishSession(outcome, note ? `${reason} — ${note}` : reason);
+});
+
+function finishSession(outcome, reason){
+  const o = OUTCOME[outcome];
+  completed++;
+  tally[outcome]++;
+  el('completed').textContent = completed;
+
+  el('loTitle').textContent  = o.label;
+  el('loReason').textContent = reason || 'All checks passed';
+  el('loTime').textContent   = clock12();
+  el('loDot').className      = 'lo-dot ' + o.dot;
+  el('lastOutcome').hidden   = false;
+
+  closeSession();
+}
+
+// Verified needs no reason; the other two do.
+el('vVerify').addEventListener('click', () => finishSession('verified', ''));
+el('vReject').addEventListener('click', () => askReason('rejected'));
+el('vUnable').addEventListener('click', () => askReason('unable'));
+
+/* ================================================================
+   6. Session shell: open, timers, reset, close
+================================================================ */
+let durTimer = null, netTimer = null, callSecs = 0, stream = null;
+let previewReady = Promise.resolve();   // the live call waits for the agent camera
+
+function openSession(){
+  el('home').hidden = true;
+  el('session').hidden = false;
+  document.body.style.overflow = 'hidden';
+
+  callSecs = 0;
+  el('dur').textContent = '00:00';
+  durTimer = setInterval(() => {
+    callSecs++;
+    el('dur').textContent =
+      `${String(Math.floor(callSecs / 60)).padStart(2,'0')}:${String(callSecs % 60).padStart(2,'0')}`;
+  }, 1000);
+
+  // Live call: real RTCPeerConnection.getStats(). Simulated call: jittering placeholders.
+  netTimer = setInterval(() => {
+    if (RTC.live) return RTC.paintStats();
+    const j = base => base + Math.round((Math.random() - .5) * 40);
+    el('dn1').textContent = j(264); el('up1').textContent = j(216);
+    el('dn2').textContent = j(212); el('up2').textContent = j(229);
+  }, 1500);
+
+  // A live customer sends the selfie + PAN from their SVC journey right after
+  // the accept ('journey' messages); until they land those rows stay empty.
+  const live = RTC.meta;
+  const submitted = clock12(live?.ringingAt ? new Date(live.ringingAt) : new Date(Date.now() - 6 * 60000));
+  loadJourneyDoc('selfie',  live ? null : MOCK.selfie, submitted);
+  loadJourneyDoc('pan',     live ? null : MOCK.pan,    submitted);
+  loadJourneyDoc('aadhaar', MOCK.aadhaar, submitted);
+
+  runAllChecks();          // the automated checks need no agent action to start
+  recount();
+  previewReady = el('preview').checked ? startPreview() : Promise.resolve();
+}
+
+function closeSession(){
+  RTC.hangup();
+  clearInterval(durTimer); clearInterval(netTimer);
+  stopPreview();
+  el('session').hidden = true;
+  el('home').hidden = false;
+  document.body.style.overflow = '';
+  resetSession();
+
+  if (markOff || !el('avail').checked){
+    markOff = false;
+    el('status').checked = false;
+    el('status').dispatchEvent(new Event('change'));
+  } else {
+    setStage('online');
+    queueNextCall();
+  }
+  el('markOffline').textContent = 'Mark me offline after this call';
+  el('avail').checked = true;
+  el('availTxt').textContent = 'Available for calls';
+}
+
+// Everything a fresh call must forget.
+function resetSession(){
+  done.clear();
+
+  el('code').value = '';
+  el('code').classList.remove('auto');
+
+  all('.verdict').forEach(b => {
+    b.setAttribute('aria-pressed', 'false');
+    b.disabled = !ALWAYS_OPEN.includes(b.dataset.item);
+  });
+  all('.row-item, .qblock').forEach(r => r.classList.remove('done'));
+  all('.rail .step').forEach(s => s.classList.toggle('done', +s.dataset.step <= 2));
+  all('.remark input').forEach(i => i.value = '');
+
+  clearTile('sigShot');
+  resetChecks();
+  resetMatch('sigMatchBtn', 'sigMatchOut');
+  Object.keys(DOC).forEach(kind => { resetExtract(kind); resetOcr(kind); resetStatus(kind); });
+  ['m2Src','m3Src'].forEach(id => {
+    el(id).textContent = 'Pre journey';
+    el(id).classList.remove('live');
+  });
+  selfieTitle = "Selfie received from customer's journey";
+  ['selfie','pan','aadhaar'].forEach(k => loadJourneyDoc(k, null));
+
+  ['capModal','editModal','viewModal','reasonModal'].forEach(id => el(id).hidden = true);
+  el('camBanner').hidden = true;
+  el('camErr').classList.remove('show');
+  el('camStart').textContent = 'Start my camera';
+  el('pip').classList.remove('blocked');
+
+  refreshMatchButtons();
+  recount();
+}
+
+/* ---- session chrome controls ---- */
+function toggleBtn(id, onChange){
+  const b = el(id);
+  b.addEventListener('click', () => {
+    const next = b.getAttribute('aria-pressed') !== 'true';
+    b.setAttribute('aria-pressed', String(next));
+    onChange?.(next);
+  });
+}
+toggleBtn('micBtn', on => RTC.setMic(on));
+toggleBtn('camBtn', on => {
+  el('preview').checked = on;
+  on ? startPreview() : stopPreview();
+});
+
+el('reconnect').addEventListener('click', () => {
+  RTC.restart();                 // asks the customer to re-offer with an ICE restart
+  const f = el('custFeed');
+  f.classList.add('off');
+  setTimeout(() => f.classList.remove('off'), 900);
+});
+
+el('markOffline').addEventListener('click', () => {
+  markOff = !markOff;
+  el('markOffline').textContent = markOff
+    ? 'You\u2019ll go offline after this call'
+    : 'Mark me offline after this call';
+});
+
+el('avail').addEventListener('change', e => {
+  el('availTxt').textContent = e.target.checked ? 'Available for calls' : 'Not taking calls';
+});
+
+/* ================================================================
+   7. Camera (MediaDevices)
+      Three gates, in the order they actually bite:
+      1. Secure context — getUserMedia rejects silently on file://
+      2. Inside an iframe, an explicit allow="camera" grant
+      3. A prior Block decision — browsers never re-prompt
+================================================================ */
+const secureEnough = () =>
+  window.isSecureContext || ['localhost','127.0.0.1','[::1]'].includes(location.hostname);
+
+async function permState(){
+  try { return (await navigator.permissions.query({name:'camera'})).state; }
+  catch { return 'unknown'; }
+}
+
+async function diagnose(){
+  const cams = navigator.mediaDevices
+    ? (await navigator.mediaDevices.enumerateDevices().catch(() => [])).filter(d => d.kind === 'videoinput').length
+    : 0;
+  return {
+    protocol: location.protocol,
+    secure: secureEnough(),
+    framed: window.self !== window.top,
+    api: !!navigator.mediaDevices?.getUserMedia,
+    perm: await permState(),
+    cams
+  };
+}
+
+function showBanner({title, why, fix, diag}){
+  el('camBanner').hidden = false;
+  el('cbTitle').textContent = title;
+  el('cbWhy').innerHTML = why || '';
+  el('cbFix').innerHTML = fix || '';
+  el('cbDiag').innerHTML = Object.entries(diag || {}).map(([k, v]) => {
+    const good = k === 'framed' ? v === false
+               : k === 'perm'   ? v === 'granted'
+               : k === 'cams'   ? v > 0
+               : k === 'protocol' ? v === 'https:'
+               : v === true;
+    return `<li class="${good ? 'good' : 'bad'}">${k}=<b>${v}</b></li>`;
+  }).join('');
+}
+
+async function camFail(title, why, fix){
+  showBanner({title, why, fix, diag: await diagnose()});
+  el('camErr').textContent = 'Camera blocked — see the banner at the top.';
+  el('camErr').classList.add('show');
+  el('pip').classList.add('blocked');
+  el('camStart').textContent = 'Retry camera';
+}
+
+// Device labels stay empty until permission is granted, so enumerate after getUserMedia.
+async function listCameras(){
+  try {
+    const cams = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'videoinput');
+    if (cams.length < 2){ el('camPick').hidden = true; return; }
+    const current = stream?.getVideoTracks()[0]?.getSettings().deviceId;
+    el('camSelect').innerHTML = cams.map((c, i) =>
+      `<option value="${c.deviceId}"${c.deviceId === current ? ' selected' : ''}>${c.label || 'Camera ' + (i + 1)}</option>`
+    ).join('');
+    el('camPick').hidden = false;
+  } catch { el('camPick').hidden = true; }
+}
+
+async function startPreview(deviceId){
+  el('camErr').classList.remove('show');
+  el('pip').classList.remove('blocked');
+
+  const d = await diagnose();
+  if (!d.secure) return camFail(
+    'No prompt will appear on ' + location.protocol,
+    'Browsers refuse camera access outside a secure origin, and they do it <em>silently</em> — no permission dialog is ever shown.',
+    'Serve the file instead: <code>cd</code> to its folder, run <code>python3 -m http.server 8000</code>, then open <code>http://localhost:8000/agent-console.html</code>.');
+  if (d.framed) return camFail(
+    'Blocked by the embedding frame',
+    'This page is inside an iframe with no <code>allow="camera"</code> permission, so the request is rejected before a prompt can appear.',
+    'Open the page in its own browser tab.');
+  if (!d.api) return camFail(
+    'MediaDevices API unavailable',
+    '<code>navigator.mediaDevices.getUserMedia</code> does not exist on this origin.',
+    'Use a current Chrome, Edge, Firefox, or Safari over https or localhost.');
+  if (d.perm === 'denied') return camFail(
+    'Camera was previously blocked',
+    'The permission is set to <b>denied</b> for this origin. Browsers never re-prompt after a block — the request fails instantly.',
+    'Click the camera or tune icon in the address bar → allow camera → reload.');
+  if (d.cams === 0) return camFail(
+    'No camera detected',
+    'The browser reports zero video input devices.',
+    'Connect a webcam, or check that no privacy shutter or OS-level camera block is active.');
+
+  stopPreview();   // release the old track before asking for a new one
+
+  const video = deviceId
+    ? {deviceId:{exact:deviceId}}
+    : {width:{ideal:640}, height:{ideal:480}, facingMode:'user'};
+
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({video, audio:false});
+
+    // The PIP is the agent's mirrored self-view. Until a live customer's
+    // stream arrives, the main feed stands in with the same camera.
+    el('selfVideo').srcObject = stream;
+    if (!RTC.remote) el('custVideo').srcObject = stream;
+    await Promise.all([
+      el('custVideo').play().catch(() => {}),
+      el('selfVideo').play().catch(() => {})
+    ]);
+    RTC.useCamera(stream);         // send it to the customer if a call is up
+
+    el('custFeed').classList.add('live');
+    el('pip').classList.add('live');
+    el('camBtn').setAttribute('aria-pressed', 'true');
+    el('camBanner').hidden = true;
+    listCameras();
+  } catch (e) {
+    const tag = `<code>${e.name}</code>`;
+    switch (e.name){
+      case 'NotAllowedError': case 'SecurityError':
+        camFail('Permission denied', `The prompt appeared and was dismissed or denied (${tag}).`,
+          'Click the camera icon in the address bar, choose Allow, then press Request camera again.'); break;
+      case 'NotReadableError': case 'AbortError':
+        camFail('Camera is busy', `The OS handed back ${tag} — another app already holds the device.`,
+          'Close Zoom, Teams, Photo Booth, or any other tab using the camera, then retry.'); break;
+      case 'NotFoundError': case 'OverconstrainedError':
+        camFail('No camera matches that request', `${tag} — the selected device is gone or the constraints are too strict.`,
+          'Pick a different camera from the Camera dropdown.'); break;
+      default:
+        camFail(e.name || 'Camera error', `<code>${e.name}: ${e.message}</code>`, 'Retry, or try a different browser.');
+    }
+  }
+}
+
+function stopPreview(){
+  stream?.getTracks().forEach(t => t.stop());
+  stream = null;
+  RTC.useCamera(null);
+  el('selfVideo').srcObject = null;
+  el('pip').classList.remove('live');
+  if (RTC.remote) return;          // keep showing the live customer
+  el('custVideo').srcObject = null;
+  el('custFeed').classList.remove('live');
+}
+
+// A direct click is the most reliable way to surface the permission prompt.
+el('camStart').addEventListener('click', () => startPreview());
+el('cbRetry').addEventListener('click', () => startPreview());
+el('cbClose').addEventListener('click', () => el('camBanner').hidden = true);
+el('camSelect').addEventListener('change', e => startPreview(e.target.value));
+el('preview').addEventListener('change', e => e.target.checked ? startPreview() : stopPreview());
+navigator.mediaDevices?.addEventListener?.('devicechange', () => { if (stream) listCameras(); });
+
+/* ================================================================
+   8. Task completion
+      Every gradeable sub-task carries data-item="<step>-<n>".
+      A verdict click resolves it; anything that invalidates the
+      evidence un-resolves it again.
+================================================================ */
+const STEPS = [3, 4, 5, 6, 7];
+const ALWAYS_OPEN = ['6-1', '6-2'];   // questions grade as soon as they're asked
+const done = new Set();
+
+const stepIds = step =>
+  [...new Set([...document.querySelectorAll(`#t${step} [data-item]`)].map(n => n.dataset.item))];
+
+function recount(){
+  let outstanding = 0;
+  STEPS.forEach(step => {
+    const ids = stepIds(step);
+    const left = ids.filter(id => !done.has(id)).length;
+    outstanding += left;
+
+    const rem = el('rem' + step);
+    if (rem){
+      rem.textContent = `${left}/${ids.length} task${ids.length > 1 ? 's' : ''} remaining`;
+      rem.classList.toggle('clear', left === 0);
+    }
+    document.querySelector(`.rail .step[data-step="${step}"]`)?.classList.toggle('done', left === 0);
+  });
+  el('vVerify').disabled = outstanding > 0;
+}
+
+const markRows = (id, on) =>
+  all(`.row-item[data-item="${id}"], .qblock[data-item="${id}"]`).forEach(r => r.classList.toggle('done', on));
+
+function resolve(id){ done.add(id);    markRows(id, true);  recount(); }
+function unresolve(id){ done.delete(id); markRows(id, false); recount(); }
+
+function setVerdicts(item, on){
+  all(`.verdict[data-item="${item}"]`).forEach(b => {
+    b.disabled = !on;
+    if (!on) b.setAttribute('aria-pressed', 'false');
+  });
+}
+
+all('.verdict').forEach(btn => btn.addEventListener('click', () => {
+  const id = btn.dataset.item;
+  all(`.verdict[data-item="${id}"]`).forEach(b => b.setAttribute('aria-pressed', String(b === btn)));
+  resolve(id);
+}));
+
+/* ---- copy-to-clipboard on the ID fields ---- */
+async function copyText(text){
+  try {
+    if (navigator.clipboard && window.isSecureContext){
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch { /* fall through to the legacy path */ }
+
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.readOnly = true;
+  ta.style.cssText = 'position:fixed;top:-1000px;opacity:0';
+  document.body.appendChild(ta);
+  ta.select();
+  ta.setSelectionRange(0, text.length);
+  let ok = false;
+  try { ok = document.execCommand('copy'); } catch {}
+  ta.remove();
+  return ok;
+}
+
+all('.copy').forEach(btn => btn.addEventListener('click', async () => {
+  if (!await copyText(btn.dataset.copy)) return;
+  btn.classList.add('done');
+  setTimeout(() => btn.classList.remove('done'), 1300);
+}));
+
+/* ---- random number check ---- */
+el('genCode').addEventListener('click', () => {
+  const box = el('code');
+  box.value = String(Math.floor(1000 + Math.random() * 9000));
+  box.classList.add('auto');            // greyed until the agent types over it
+  setVerdicts('3-1', true);
+  RTC.send('code', {code: box.value});  // shows on the customer's screen to read aloud
+});
+
+// Focusing a generated code selects it, so typing replaces rather than appends.
+el('code').addEventListener('focus', e => { if (e.target.classList.contains('auto')) e.target.select(); });
+
+el('code').addEventListener('input', e => {
+  const clean = e.target.value.replace(/\D/g, '').slice(0, 4);   // maxlength won't stop a paste
+  if (clean !== e.target.value) e.target.value = clean;
+  e.target.classList.remove('auto');
+  if (clean) setVerdicts('3-1', true);
+});
+
+/* ================================================================
+   9. Mock session payload
+      Drawn on a canvas so the file stays self-contained. In production
+      these are URLs that arrive with the case.
+================================================================ */
+const SELFIE_PHOTO = "data:image/jpeg;base64,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";
+
+const AADHAAR_PHOTO = "data:image/jpeg;base64,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";
+
+const MOCK = (() => {
+  const make = (w, h, draw) => {
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    draw(c.getContext('2d'), w, h);
+    return c.toDataURL('image/jpeg', .9);
+  };
+
+  const card = (title, lines) => make(520, 330, (g, w, h) => {
+    g.fillStyle = '#eef1f7'; g.fillRect(0, 0, w, h);
+    g.fillStyle = '#dfe5f0'; g.fillRect(0, 0, w, 54);
+    g.fillStyle = '#25379f'; g.font = '700 19px Roboto, sans-serif';
+    g.fillText(title, 20, 35);
+    g.fillStyle = '#c9d1e0'; g.fillRect(w - 130, 78, 105, 130);   // photo box
+    g.fillStyle = '#8b93a7'; g.font = '600 12px Roboto, sans-serif';
+    g.fillText('PHOTO', w - 105, 148);
+    g.font = '400 15px Roboto, sans-serif';
+    lines.forEach(([k, v], i) => {
+      g.fillStyle = '#6f7480'; g.fillText(k, 22, 100 + i * 44);
+      g.fillStyle = '#1a1a1a'; g.font = '600 16px Roboto, sans-serif';
+      g.fillText(v, 22, 122 + i * 44);
+      g.font = '400 15px Roboto, sans-serif';
+    });
+    g.strokeStyle = '#b9c2d4'; g.lineWidth = 2; g.strokeRect(1, 1, w - 2, h - 2);
+    g.fillStyle = 'rgba(37,55,159,.16)'; g.font = '700 40px Roboto, sans-serif';
+    g.fillText('SAMPLE', 150, 300);
+  });
+
+  const selfie = SELFIE_PHOTO;
+  return {
+    selfie,
+    pan: card('INCOME TAX DEPARTMENT', [
+      ['Permanent Account Number', 'IZGPK3925P'],
+      ['Name', 'ABDUL SOHEL KHAN'],
+      ['Date of Birth', '06/04/1998']
+    ]),
+    aadhaar: AADHAAR_PHOTO
+  };
+})();
+
+/* ---- images that arrive with the session ---- */
+const JOURNEY = {};   // kind -> data URL
+
+function loadJourneyDoc(kind, src, when){
+  JOURNEY[kind] = src || null;
+
+  if (kind === 'selfie'){
+    el('journeyBox').classList.toggle('has', !!src);
+    src ? el('journeySelfie').src = src : el('journeySelfie').removeAttribute('src');
+    el('journeyBox').disabled = !src;      // the image itself opens the viewer
+    el('delSelfie').disabled = !src;
+    if (!src) setSelfieStatus(null, '—');
+    else if (when) setSelfieStatus("Received from customer's journey", 'Submitted ' + when);
+  } else {
+    const u = DOC[kind];
+    el(u.view).disabled = !src;
+    el(u.time).textContent = src ? 'Received ' + when : 'Not received';
+    el(u.extract).disabled = !src;
+  }
+  refreshMatchButtons();
+}
+
+let selfieTitle = "Selfie received from customer's journey";
+
+function setSelfieStatus(text, time){
+  const s = el('selfieStatus');
+  s.classList.toggle('empty', !text);
+  s.querySelector('em').textContent = text || 'No selfie received';
+  el('journeyTime').textContent = time;
+}
+
+// Removing the selfie takes every check that depends on it back to unrunnable.
+function deleteSelfie(){
+  selfieTitle = 'Selfie on file';
+  loadJourneyDoc('selfie', null);
+  resetChecks();
+  CHECKS.forEach(runCheck);               // each one reports the missing selfie
+}
+
+el('journeyBox').addEventListener('click', () => showImage(selfieTitle, JOURNEY.selfie));
+el('recapSelfie').addEventListener('click', () => startSelfie());
+el('delSelfie').addEventListener('click', deleteSelfie);
+
+/* ================================================================
+   10. Automated checks on the captured selfie
+       Each entry stands in for one API call — replace score().
+================================================================ */
+const THRESHOLD = 85;
+const score = () => Math.round(62 + Math.random() * 36);
+
+/* Every check runs against the selfie on file (journey image, or whatever the
+   agent recaptured over it); face matches additionally need their document. */
+const CHECKS = [
+  {id:'4-3', btn:'m2Btn', out:'m2Out', kind:'face', ref:'pan',     refName:'PAN photo'},
+  {id:'4-4', btn:'m3Btn', out:'m3Out', kind:'face', ref:'aadhaar', refName:'Aadhaar photo'},
+  {id:'4-5', btn:'dfBtn', out:'dfOut', kind:'deepfake'}
+];
+
+// Scores are bare percentages; colour carries pass/fail against THRESHOLD.
+function phrase(kind, n, pass){
+  const pct = `<span class="pct">${n}%</span>`;
+  return kind === 'deepfake' ? `${pass ? 'False' : 'True'} | ${pct}` : pct;
+}
+
+function runCheck(c){
+  const btn = el(c.btn), out = el(c.out);
+
+  // Nothing runs without a selfie to compare, or without the reference document.
+  const missing = !JOURNEY.selfie ? 'selfie' : (c.ref && !JOURNEY[c.ref] ? c.refName : null);
+  if (missing){
+    out.textContent = `No ${missing} received`;
+    out.classList.remove('ok', 'bad');
+    btn.disabled = true;
+    setVerdicts(c.id, false);
+    return;
+  }
+
+  btn.disabled = true;
+  out.textContent = c.kind === 'face' ? 'Comparing…' : 'Analysing…';
+  out.classList.remove('ok', 'bad');
+
+  setTimeout(() => {
+    const n = score(), pass = n >= THRESHOLD;
+    out.innerHTML = phrase(c.kind, n, pass);
+    out.classList.add(pass ? 'ok' : 'bad');
+    btn.textContent = btn.dataset.rerun;
+    btn.disabled = false;
+    setVerdicts(c.id, true);            // the agent can grade it now
+  }, 900 + Math.random() * 500);
+}
+
+// Capturing the selfie kicks all of them off, staggered so results land in order.
+const runAllChecks = () => CHECKS.forEach((c, i) => setTimeout(() => runCheck(c), i * 260));
+
+function resetChecks(){
+  CHECKS.forEach(c => {
+    el(c.btn).disabled = true;
+    el(c.btn).textContent = c.kind === 'face' ? 'Re-match' : 'Re-run';
+    el(c.out).textContent = 'Not run';
+    el(c.out).classList.remove('ok', 'bad');
+    setVerdicts(c.id, false);
+    unresolve(c.id);
+  });
+}
+
+CHECKS.forEach(c => el(c.btn).addEventListener('click', () => runCheck(c)));
+
+/* ---- manual match (name, signature) ---- */
+function resetMatch(btnId, outId){
+  el(btnId).textContent = 'Match';
+  el(outId).textContent = 'Not run';
+  el(outId).classList.remove('ok', 'bad');
+}
+
+function runMatch(btn, out, onDone){
+  btn.disabled = true;
+  btn.textContent = 'Matching…';
+  out.textContent = 'Comparing…';
+  out.classList.remove('ok', 'bad');
+
+  setTimeout(() => {
+    const n = score(), pass = n >= THRESHOLD;
+    out.innerHTML = phrase('face', n, pass);
+    out.classList.add(pass ? 'ok' : 'bad');
+    btn.textContent = 'Re-match';
+    btn.disabled = false;
+    onDone?.(n, pass);
+  }, 1100);
+}
+
+function wireMatch(btnId, outId, item){
+  el(btnId).addEventListener('click', () => runMatch(el(btnId), el(outId), () => setVerdicts(item, true)));
+}
+wireMatch('sigMatchBtn', 'sigMatchOut', '7-2');
+
+function refreshMatchButtons(){
+  el('sigMatchBtn').disabled = !(el('sigShot').classList.contains('filled') && JOURNEY.pan);
+}
+
+/* ================================================================
+   11. Documents: extraction, OCR correction, registry lookups
+================================================================ */
+const DOC = {
+  pan: {
+    key:'pan', name:'PAN',
+    time:'panJourneyTime', view:'viewPanJourney', extract:'panExtractBtn', out:'panExtractOut',
+    ocrBtn:'panOcrBtn', ocrOut:'panOcrOut',
+    nameBtn:'panNameBtn', nameOut:'panNameOut',
+    dbBtn:'panDbBtn', dbOut:'panDbOut',
+    items:{extract:'5-1', name:'5-2', db:'5-5'},
+    check:'4-3', pill:'m2Src',
+    values:['IZGPK3925P', 'ABDUL SOHEL KHAN', '06/04/1998'],
+    dbPass:'Active · valid PAN', dbFail:'Inactive or not found'
+  },
+  aadhaar: {
+    key:'aad', name:'Aadhaar',
+    time:'aadJourneyTime', view:'viewAadJourney', extract:'aadExtractBtn', out:'aadExtractOut',
+    ocrBtn:'aadOcrBtn', ocrOut:'aadOcrOut',
+    nameBtn:'aadNameBtn', nameOut:'aadNameOut',
+    dbBtn:'aadDbBtn', dbOut:'aadDbOut',
+    items:{extract:'5-3', name:'5-4', db:'5-6'},
+    check:'4-4', pill:'m3Src',
+    values:['XXXX XXXX 4021', 'SRISHTI SHARMA', '14/08/1994',
+            'Chandivali, L Ward, Mumbai Suburban, Maharashtra 400072'],
+    dbPass:'Seeded with PAN', dbFail:'Not seeded'
+  }
+};
+
+function resetExtract(kind){
+  const u = DOC[kind];
+  el(u.extract).textContent = 'Extract';
+  el(u.out).hidden = true;
+  el(u.out).classList.remove('editing');
+  el(u.out).querySelectorAll('.ocr-field').forEach(f => { f.value = ''; f.readOnly = true; });
+  el(u.nameBtn).disabled = true;
+  resetMatch(u.nameBtn, u.nameOut);
+}
+
+function resetOcr(kind){
+  const u = DOC[kind];
+  el(u.ocrBtn).disabled = true;
+  el(u.ocrBtn).textContent = 'OCR Edit';
+  el(u.ocrBtn).dataset.editing = 'false';
+  el(u.ocrOut).textContent = 'Correct any mis-read field';
+  el(u.ocrOut).classList.remove('ok');
+}
+
+function resetStatus(kind){
+  const u = DOC[kind];
+  el(u.dbBtn).textContent = 'Check';
+  el(u.dbBtn).disabled = true;
+  el(u.dbOut).textContent = 'Not run';
+  el(u.dbOut).classList.remove('ok', 'bad');
+  unresolve(u.items.db);
+  setVerdicts(u.items.db, false);
+}
+
+/* Extraction: one API call that also gives the name match and the registry
+   lookup everything they need, so both run straight away. */
+function runExtract(kind){
+  const u = DOC[kind], btn = el(u.extract);
+  btn.disabled = true;
+  btn.textContent = 'Extracting…';
+
+  setTimeout(() => {
+    resetOcr(kind);                                   // fresh values, fresh edit state
+    const fields = el(u.out).querySelectorAll('.ocr-field');
+    u.values.forEach((v, i) => { if (fields[i]) fields[i].value = v; });
+    el(u.out).hidden = false;
+
+    btn.textContent = 'Re-extract';
+    btn.disabled = false;
+    el(u.nameBtn).disabled = false;
+    el(u.dbBtn).disabled = false;
+    el(u.ocrBtn).disabled = false;
+    setVerdicts(u.items.extract, true);
+
+    runMatch(el(u.nameBtn), el(u.nameOut), () => setVerdicts(u.items.name, true));
+    setTimeout(() => runStatus(kind), 300);
+  }, 1300);
+}
+
+/* Registry lookup — a state, not a score. */
+function runStatus(kind){
+  const u = DOC[kind], btn = el(u.dbBtn), out = el(u.dbOut);
+  btn.disabled = true;
+  btn.textContent = 'Checking…';
+  out.textContent = 'Querying…';
+  out.classList.remove('ok', 'bad');
+
+  setTimeout(() => {
+    const ok = Math.random() > 0.35;
+    out.textContent = ok ? u.dbPass : u.dbFail;
+    out.classList.add(ok ? 'ok' : 'bad');
+    btn.textContent = 'Re-check';
+    btn.disabled = false;
+    setVerdicts(u.items.db, true);
+  }, 1100);
+}
+
+/* OCR edit: correct mis-read fields before matching on them. */
+function toggleOcr(kind){
+  const u = DOC[kind], btn = el(u.ocrBtn), box = el(u.out);
+  const fields = box.querySelectorAll('.ocr-field');
+
+  if (btn.dataset.editing !== 'true'){
+    fields.forEach(f => f.readOnly = false);
+    box.classList.add('editing');
+    btn.textContent = 'Save';
+    btn.dataset.editing = 'true';
+    el(u.ocrOut).textContent = 'Editing — correct and save';
+    fields[0].focus();
+    fields[0].select();
+    return;
+  }
+
+  fields.forEach(f => f.readOnly = true);
+  box.classList.remove('editing');
+  btn.textContent = 'OCR Edit';
+  btn.dataset.editing = 'false';
+  el(u.ocrOut).textContent = 'Edited manually';
+  el(u.ocrOut).classList.add('ok');
+
+  // Edited fields invalidate anything derived from the old values.
+  resetMatch(u.nameBtn, u.nameOut);
+  unresolve(u.items.name);
+  setVerdicts(u.items.name, false);
+  resetStatus(kind);
+  el(u.dbBtn).disabled = false;
+}
+
+Object.keys(DOC).forEach(kind => {
+  el(DOC[kind].extract).addEventListener('click', () => runExtract(kind));
+  el(DOC[kind].dbBtn).addEventListener('click',   () => runStatus(kind));
+  el(DOC[kind].ocrBtn).addEventListener('click',  () => toggleOcr(kind));
+  el(DOC[kind].nameBtn).addEventListener('click', () =>
+    runMatch(el(DOC[kind].nameBtn), el(DOC[kind].nameOut), () => setVerdicts(DOC[kind].items.name, true)));
+  el(DOC[kind].view).addEventListener('click', () =>
+    showImage(`${DOC[kind].name} received from customer's journey`, JOURNEY[kind]));
+});
+
+/* Recapturing from the live video replaces the image that arrived with the
+   journey — for the selfie that means re-running every automated check. */
+function setSelfieImage(url){
+  selfieTitle = 'Selfie — recaptured on this call';
+  loadJourneyDoc('selfie', url);
+  setSelfieStatus('Screenshot captured', 'Captured ' + clock12());
+  CHECKS.forEach(c => { unresolve(c.id); setVerdicts(c.id, false); });
+  runAllChecks();
+}
+
+function setDocImage(kind, url){
+  if (kind === 'selfie') return setSelfieImage(url);
+  const u = DOC[kind];
+  JOURNEY[kind] = url;
+  el(u.time).textContent = 'Captured ' + clock12();
+  el(u.view).disabled = false;
+  el(u.extract).disabled = false;
+
+  // the face-match row has to say which image it compared against
+  el(u.pill).textContent = 'Recaptured';
+  el(u.pill).classList.add('live');
+
+  // A new image invalidates whatever was read off the old one.
+  resetExtract(kind);
+  resetStatus(kind);
+  resetOcr(kind);
+  [u.items.extract, u.items.name].forEach(item => { unresolve(item); setVerdicts(item, false); });
+
+  // and the face match against this document has to run again
+  const c = CHECKS.find(x => x.id === u.check);
+  if (c) runCheck(c);
+}
+
+/* ================================================================
+   12. Capture pipeline
+       selfie  : live feed  -> Edit Screenshot -> tile
+       doc/sig : Image Capture (framing) -> Edit Screenshot -> tile
+================================================================ */
+const CAPTURE = {
+  sigShot: {item:'7-1', label:'Signature Screenshot', title:'Signature Image Capture', live:true},
+  // These have no tile — they replace the image that arrived with the journey.
+  // The selfie is grabbed straight off the live feed when there is one (live:false).
+  selfie:  {item:null, doc:'selfie',  title:'Selfie Image Capture',  live:false},
+  panDoc:  {item:null, doc:'pan',     title:'PAN Image Capture',     live:true},
+  aadDoc:  {item:null, doc:'aadhaar', title:'Aadhaar Image Capture', live:true}
+};
+
+// Tiles that show a View / Recapture panel once filled.
+const RECEIVED = {
+  sigShot: {panel:'rcvSig', time:'rcvSigTime', title:'Signature — captured on this call'}
+};
+
+const captured = {};   // tileId -> data URL, for the viewer
+let capTarget = null, hiRes = false, frameOn = true, camIndex = 0;
+
+function openCapture(target){
+  capTarget = target;
+  el('capTitle').textContent = CAPTURE[target].title;
+  el('capModal').hidden = false;
+  el('capFrame').hidden = !frameOn;
+  el('capFrameBtn').setAttribute('aria-pressed', String(frameOn));
+  el('capHd').setAttribute('aria-pressed', String(hiRes));
+  const src = RTC.remote || stream;
+  if (src){
+    el('capVideo').srcObject = src;
+    el('capVideo').play().catch(() => {});
+  }
+  el('capShoot').focus();
+}
+
+function closeCapture(){
+  el('capModal').hidden = true;
+  el('capVideo').srcObject = null;
+}
+
+el('capClose').addEventListener('click', closeCapture);
+
+el('capFrameBtn').addEventListener('click', () => {
+  frameOn = !frameOn;
+  el('capFrame').hidden = !frameOn;
+  el('capFrameBtn').setAttribute('aria-pressed', String(frameOn));
+});
+
+el('capHd').addEventListener('click', async () => {
+  hiRes = !hiRes;
+  el('capHd').setAttribute('aria-pressed', String(hiRes));
+  const track = stream?.getVideoTracks()[0];
+  if (!track) return;
+  // applyConstraints beats renegotiating the whole stream
+  try {
+    await track.applyConstraints(hiRes
+      ? {width:{ideal:1920}, height:{ideal:1080}}
+      : {width:{ideal:640},  height:{ideal:480}});
+  } catch { /* device can't do it — leave the toggle where the agent put it */ }
+});
+
+el('capSwitch').addEventListener('click', async () => {
+  const cams = (await navigator.mediaDevices.enumerateDevices().catch(() => []))
+    .filter(d => d.kind === 'videoinput');
+  if (cams.length < 2) return;
+  camIndex = (camIndex + 1) % cams.length;
+  await startPreview(cams[camIndex].deviceId);
+  if (stream) el('capVideo').srcObject = stream;
+});
+
+el('capShoot').addEventListener('click', () => {
+  const v = el('capVideo');
+  if (!v.videoWidth) return;
+  openEdit(grabFrame(v, frameOn), capTarget);
+  closeCapture();
+});
+
+// Crop to the on-screen guide when Frame is on — that's what the agent aimed at.
+function grabFrame(video, useFrame){
+  const vw = video.videoWidth, vh = video.videoHeight;
+  const c = document.createElement('canvas'), g = c.getContext('2d');
+  if (useFrame){
+    const sw = vw * .64, sh = vh * .56;
+    c.width = sw; c.height = sh;
+    g.drawImage(video, vw * .18, vh * .20, sw, sh, 0, 0, sw, sh);
+  } else {
+    c.width = vw; c.height = vh;
+    g.drawImage(video, 0, 0);
+  }
+  return c.toDataURL('image/jpeg', .92);
+}
+
+/* ---- Edit Screenshot ---- */
+const edit = {img:null, rot:0, mir:false, zoom:1, crop:null, target:null, cropping:false};
+
+function openEdit(dataURL, target){
+  const img = new Image();
+  img.onload = () => {
+    Object.assign(edit, {img, rot:0, mir:false, zoom:1, crop:null, target, cropping:false});
+    endCrop();
+    el('editModal').hidden = false;
+    drawEdit();
+    el('submitShot').focus();
+  };
+  img.src = dataURL;
+}
+
+function drawEdit(){
+  const {img, rot, mir, crop} = edit;
+  if (!img) return;
+  const c = el('editCanvas'), g = c.getContext('2d');
+  const src = crop || {x:0, y:0, w:img.naturalWidth, h:img.naturalHeight};
+  const swap = rot % 180 !== 0;
+  c.width  = swap ? src.h : src.w;
+  c.height = swap ? src.w : src.h;
+
+  g.save();
+  g.translate(c.width / 2, c.height / 2);
+  g.rotate(rot * Math.PI / 180);
+  if (mir) g.scale(-1, 1);
+  g.drawImage(img, src.x, src.y, src.w, src.h, -src.w / 2, -src.h / 2, src.w, src.h);
+  g.restore();
+
+  c.style.transform = `scale(${edit.zoom})`;
+}
+
+all('.edit-tool').forEach(btn => btn.addEventListener('click', () => {
+  switch (btn.dataset.act){
+    case 'rotate':  edit.rot = (edit.rot + 90) % 360; endCrop(); break;
+    case 'mirror':  edit.mir = !edit.mir; endCrop(); break;
+    case 'reset':   Object.assign(edit, {rot:0, mir:false, zoom:1}); endCrop(); break;
+    case 'zoomin':  edit.zoom = Math.min(edit.zoom + .15, 2.5); break;
+    case 'zoomout': edit.zoom = Math.max(edit.zoom - .15, .4); break;
+    case 'crop':    edit.cropping ? applyCrop() : beginCrop(); return;
+  }
+  drawEdit();
+}));
+
+/* ---- crop: drag to move, corner handle to resize ---- */
+function beginCrop(){
+  const box = el('editCanvas').getBoundingClientRect();
+  const stage = el('editStage').getBoundingClientRect();
+  const r = el('cropRect');
+  const w = box.width * .7, h = box.height * .7;
+  r.style.left   = (box.left - stage.left + (box.width  - w) / 2) + 'px';
+  r.style.top    = (box.top  - stage.top  + (box.height - h) / 2) + 'px';
+  r.style.width  = w + 'px';
+  r.style.height = h + 'px';
+  r.hidden = false;
+  edit.cropping = true;
+  el('cropBtn').classList.add('on');
+  el('cropBtn').querySelector('em').textContent = 'Apply';
+}
+
+function endCrop(){
+  edit.cropping = false;
+  el('cropRect').hidden = true;
+  el('cropBtn').classList.remove('on');
+  el('cropBtn').querySelector('em').textContent = 'Crop';
+}
+
+function applyCrop(){
+  const c = el('editCanvas');
+  const box = c.getBoundingClientRect(), sel = el('cropRect').getBoundingClientRect();
+  // map the on-screen selection back to canvas pixels, then bake it in
+  const kx = c.width / box.width, ky = c.height / box.height;
+  const out = document.createElement('canvas');
+  out.width  = Math.max(1, Math.round(sel.width  * kx));
+  out.height = Math.max(1, Math.round(sel.height * ky));
+  out.getContext('2d').drawImage(c,
+    Math.round((sel.left - box.left) * kx), Math.round((sel.top - box.top) * ky),
+    out.width, out.height, 0, 0, out.width, out.height);
+
+  const img = new Image();
+  img.onload = () => {
+    Object.assign(edit, {img, rot:0, mir:false, crop:null});
+    endCrop();
+    drawEdit();
+  };
+  img.src = out.toDataURL('image/jpeg', .95);
+}
+
+(function cropDrag(){
+  const r = el('cropRect');
+  let mode = null, sx = 0, sy = 0, box = null;
+
+  r.addEventListener('pointerdown', e => {
+    mode = e.target.classList.contains('crop-h') ? 'size' : 'move';
+    sx = e.clientX; sy = e.clientY;
+    box = {l:parseFloat(r.style.left), t:parseFloat(r.style.top),
+           w:parseFloat(r.style.width), h:parseFloat(r.style.height)};
+    r.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  });
+
+  r.addEventListener('pointermove', e => {
+    if (!mode) return;
+    const dx = e.clientX - sx, dy = e.clientY - sy;
+    if (mode === 'move'){
+      r.style.left = (box.l + dx) + 'px';
+      r.style.top  = (box.t + dy) + 'px';
+    } else {
+      r.style.width  = Math.max(30, box.w + dx) + 'px';
+      r.style.height = Math.max(30, box.h + dy) + 'px';
+    }
+  });
+
+  r.addEventListener('pointerup', () => { mode = null; });
+})();
+
+el('reCapture').addEventListener('click', () => {
+  el('editModal').hidden = true;
+  CAPTURE[edit.target].live ? openCapture(edit.target) : startSelfie();
+});
+
+el('submitShot').addEventListener('click', async () => {
+  const t = edit.target;
+  endCrop();
+  drawEdit();
+  const url = el('editCanvas').toDataURL('image/jpeg', .92);
+  CAPTURE[t].doc ? setDocImage(CAPTURE[t].doc, url) : fillTile(t, url);
+  el('editModal').hidden = true;
+
+  if (el('switchFront').checked && camIndex !== 0){
+    const cams = (await navigator.mediaDevices.enumerateDevices().catch(() => []))
+      .filter(d => d.kind === 'videoinput');
+    if (cams.length > 1){ camIndex = 0; startPreview(cams[0].deviceId); }
+  }
+});
+
+/* ---- tile fill / clear ---- */
+function fillTile(tileId, dataURL){
+  const btn = el(tileId);
+  Object.assign(btn.style, {backgroundImage:`url(${dataURL})`, backgroundSize:'cover', backgroundPosition:'center'});
+  btn.classList.add('taken', 'filled');
+  document.querySelector(`.shot-del[data-del="${tileId}"]`).hidden = false;
+  captured[tileId] = dataURL;
+
+  const r = RECEIVED[tileId];
+  if (r){
+    el(r.time).textContent = 'Captured at ' + clock12(new Date(), true);
+    el(r.panel).hidden = false;      // actions sit under the image, not beside a copy of it
+  }
+
+  if (CAPTURE[tileId].item) resolve(CAPTURE[tileId].item);
+  afterCapture(tileId, true);
+}
+
+function clearTile(tileId){
+  const btn = el(tileId);
+  btn.style.backgroundImage = '';
+  btn.classList.remove('taken', 'filled');
+  document.querySelector(`.shot-del[data-del="${tileId}"]`).hidden = true;
+  delete captured[tileId];
+
+  const r = RECEIVED[tileId];
+  if (r){
+    el(r.time).textContent = '—';
+    el(r.panel).hidden = true;
+  }
+
+  if (CAPTURE[tileId].item) unresolve(CAPTURE[tileId].item);
+  afterCapture(tileId, false);
+}
+
+// Downstream state that depends on a captured image.
+function afterCapture(tileId, has){
+  refreshMatchButtons();
+
+  if (tileId === 'sigShot' && !has){
+    resetMatch('sigMatchBtn', 'sigMatchOut');
+    unresolve('7-2');
+    setVerdicts('7-2', false);
+  }
+}
+
+all('.shot-del').forEach(btn => btn.addEventListener('click', () => clearTile(btn.dataset.del)));
+
+/* ---- viewer ---- */
+let viewTarget = null;
+
+function showImage(title, src, target){
+  viewTarget = target || null;
+  el('viewTitle').textContent = title;
+  el('viewImg').src = src || '';
+  el('viewRecap').hidden = !target;        // nothing to recapture for journey images
+  el('viewModal').hidden = false;
+  el('viewDone').focus();
+}
+
+all('[data-view]').forEach(b => b.addEventListener('click', () =>
+  showImage(RECEIVED[b.dataset.view].title, captured[b.dataset.view], b.dataset.view)));
+all('[data-recap]').forEach(b => b.addEventListener('click', () => openCapture(b.dataset.recap)));
+all('[data-recapdoc]').forEach(b => b.addEventListener('click', () =>
+  openCapture(b.dataset.recapdoc === 'pan' ? 'panDoc' : 'aadDoc')));
+
+el('viewClose').addEventListener('click', () => el('viewModal').hidden = true);
+el('viewDone').addEventListener('click', () => el('viewModal').hidden = true);
+el('viewRecap').addEventListener('click', () => {
+  el('viewModal').hidden = true;
+  openCapture(viewTarget);
+});
+
+/* ---- tile entry points ---- */
+function startSelfie(){
+  const v = el('custVideo');
+  if ((RTC.remote || stream) && v.videoWidth) return openEdit(grabFrame(v, false), 'selfie');
+  openCapture('selfie');                   // no live feed yet — frame it first
+}
+el('sigShot').addEventListener('click', () => openCapture('sigShot'));
+
+/* ---- one Escape stack for the session overlays ---- */
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  if (!el('reasonModal').hidden)     closeReason();
+  else if (!el('viewModal').hidden)  el('viewModal').hidden = true;
+  else if (!el('editModal').hidden)  el('editModal').hidden = true;
+  else if (!el('capModal').hidden)   closeCapture();
+});
+
+/* ================================================================
+   10. Live call — signaling over a Supabase Realtime broadcast channel
+       (config from ../svc-config.js) and WebRTC. The SVC customer
+       re-broadcasts 'ring' while queued and sends the offer; this
+       console answers. Without Realtime config (or if it can't
+       connect) the simulated calls keep working.
+================================================================ */
+const RTC = (() => {
+  const CFG   = window.SVC_CONFIG || {};
+  const TOPIC = 'realtime:unity-svc-call';
+  const ICE   = [{urls:['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302']}];
+  const STALE_MS = 9000;       // a ring not repeated for this long = customer gone
+  const id   = 'agent-' + (crypto.randomUUID?.() || Date.now().toString(36) + Math.random().toString(36).slice(2));
+
+  let ws = null, ref = 0, joinRef = '', beat = null, sweep = null, connected = false, wanted = false;
+  let pc = null, mic = null, remote = null, pendingIce = [], lastStats = null;
+  const queue   = [];          // customers waiting, oldest first: {from, meta, seen}
+  const skipped = new Set();   // declined by this agent — left for other agents
+  let ringing = null;          // entry on the incoming-call overlay
+  let current = null;          // entry in the open session
+  let claim = null;            // pending accept: {from, resolve}
+
+  const frame = (event, payload, topic = TOPIC) =>
+    JSON.stringify({topic, event, payload, ref: String(++ref), join_ref: topic === TOPIC ? joinRef : undefined});
+
+  function post(type, data, to){
+    if (connected && ws?.readyState === 1)
+      ws.send(frame('broadcast', {type:'broadcast', event:'signal', payload:{type, from:id, to, data}}));
+  }
+
+  function connect(){
+    wanted = true;
+    if (ws || !CFG.supabaseUrl || !CFG.supabaseKey) return;
+    ws = new WebSocket(`${CFG.supabaseUrl.replace(/^http/, 'ws')}/realtime/v1/websocket?apikey=${encodeURIComponent(CFG.supabaseKey)}&vsn=1.0.0`);
+    ws.onopen = () => {
+      joinRef = String(ref + 1);
+      ws.send(frame('phx_join', {config:{broadcast:{self:false, ack:false}, presence:{key:''}, private:false}}));
+      beat = setInterval(() => ws?.readyState === 1 && ws.send(frame('heartbeat', {}, 'phoenix')), 25000);
+    };
+    ws.onmessage = e => {
+      let m; try { m = JSON.parse(e.data); } catch { return; }
+      if (m.topic !== TOPIC) return;
+      if (m.event === 'phx_reply' && m.ref === joinRef && m.payload?.status === 'ok'){
+        connected = true;
+        clearTimeout(incoming);      // the simulated ring is no longer needed
+      } else if (m.event === 'broadcast' && m.payload?.event === 'signal'){
+        onMessage(m.payload.payload);
+      }
+    };
+    ws.onclose = () => {
+      clearInterval(beat); ws = null; connected = false;
+      if (wanted) setTimeout(connect, 1500);
+    };
+    clearInterval(sweep);
+    sweep = setInterval(() => {
+      const now = Date.now();
+      queue.filter(q => now - q.seen > STALE_MS).forEach(q => drop(q.from));
+    }, 2000);
+  }
+  function disconnect(){
+    wanted = false;
+    clearInterval(sweep);
+    ws?.close(); ws = null; connected = false;
+    queue.length = 0; skipped.clear(); ringing = null;
+  }
+
+  // Ring the oldest waiting customer if the agent is free.
+  function next(){
+    if (!online || countdown || current || !el('session').hidden) return;
+    const entry = queue.find(q => !skipped.has(q.from));
+    if (!entry) return;
+    ringing = entry;
+    openCall();
+  }
+
+  function drop(from){
+    const i = queue.findIndex(q => q.from === from);
+    if (i >= 0) queue.splice(i, 1);
+    skipped.delete(from);
+    if (ringing?.from === from){ ringing = null; if (countdown) endCall('cancelled'); }
+  }
+
+  async function onMessage(m){
+    if (!m || (m.to && m.to !== id)) return;
+    if (current && m.from !== current.from && !['ring','cancel','accepted'].includes(m.type)) return;
+    switch (m.type){
+      case 'ring': {
+        const q = queue.find(q => q.from === m.from);
+        if (q){ q.seen = Date.now(); q.meta = {...q.meta, ...m.data}; }
+        else if (current?.from !== m.from) queue.push({from:m.from, meta:m.data || {}, seen:Date.now()});
+        post('ring-ack', null, m.from);    // lets the customer know an agent is online
+        next();
+        break;
+      }
+      case 'cancel':
+        drop(m.from);
+        break;
+      case 'accepted':                      // the customer picked an agent
+        if (claim?.from === m.from){ claim.resolve(m.data?.agent === id); claim = null; }
+        if (m.data?.agent !== id) drop(m.from);
+        break;
+      case 'journey':                       // the customer's own selfie / PAN
+        if (current && m.data?.src) loadJourneyDoc(m.data.kind, m.data.src, clock12(new Date(current.meta.ringingAt || Date.now())));
+        break;
+      case 'offer':
+        if (current && m.from === current.from) await answer(m.data);
+        break;
+      case 'ice':
+        if (!pc || !pc.remoteDescription) pendingIce.push(m.data);
+        else await pc.addIceCandidate(m.data).catch(() => {});
+        break;
+      case 'hangup':
+        if (current && m.from === current.from) customerLeft();
+        break;
+    }
+  }
+
+  function customerLeft(){
+    current = null;                  // closeSession must not echo a hangup back
+    teardown();
+    if (!el('session').hidden) finishSession('unable', 'Customer left the call');
+  }
+
+  // The customer confirms the winner with 'accepted' — another agent may get there first.
+  async function accept(){
+    const entry = ringing;
+    ringing = null;
+    if (!entry || !connected) return false;
+    const won = await new Promise(resolve => {
+      claim = {from: entry.from, resolve};
+      post('accept', {agent:'Agent'}, entry.from);
+      setTimeout(() => { if (claim?.from === entry.from){ claim = null; resolve(false); } }, 4000);
+    });
+    drop(entry.from);
+    if (won) current = entry;
+    return won;
+  }
+  function decline(){ if (ringing) skipped.add(ringing.from); ringing = null; }
+
+  // The customer's offer always carries one audio + one video m-line, so we
+  // send on those transceivers — no renegotiation when the camera changes.
+  const tx = kind => pc?.getTransceivers().find(t => t.receiver.track?.kind === kind);
+
+  async function answer(offer){
+    if (!pc){
+      pc = new RTCPeerConnection({iceServers: ICE});
+      remote = new MediaStream();
+      pc.ontrack = e => {
+        remote.addTrack(e.track);
+        const v = el('custVideo');
+        v.srcObject = remote;
+        v.muted = false;               // this element plays the customer's voice
+        v.play().catch(() => {});
+        el('custFeed').classList.add('live');
+      };
+      pc.onicecandidate = e => { if (e.candidate) post('ice', e.candidate.toJSON(), current?.from); };
+      pc.onconnectionstatechange = () => {
+        const s = pc?.connectionState;
+        el('custFeed').classList.toggle('off', s === 'disconnected' || s === 'failed');
+        if (s === 'failed' && current) customerLeft();   // their tab closed / network gone
+      };
+    }
+    await pc.setRemoteDescription(offer);
+
+    await previewReady;
+    if (!mic){
+      try {
+        mic = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true, noiseSuppression:true}});
+        setMic(el('micBtn').getAttribute('aria-pressed') === 'true');
+      } catch { mic = null; }
+    }
+    const a = tx('audio'), v = tx('video');
+    if (a){ a.direction = 'sendrecv'; await a.sender.replaceTrack(mic?.getAudioTracks()[0] || null); }
+    if (v){ v.direction = 'sendrecv'; await v.sender.replaceTrack(stream?.getVideoTracks()[0] || null); }
+
+    await pc.setLocalDescription(await pc.createAnswer());
+    post('answer', pc.localDescription.toJSON(), current?.from);
+    for (const c of pendingIce.splice(0)) await pc.addIceCandidate(c).catch(() => {});
+  }
+
+  function teardown(){
+    pc?.close(); pc = null;
+    mic?.getTracks().forEach(t => t.stop()); mic = null;
+    remote = null; pendingIce = []; lastStats = null;
+    const v = el('custVideo');
+    v.muted = true;
+    v.srcObject = stream;              // back to the stand-in (or nothing)
+    el('custFeed').classList.toggle('live', !!stream);
+    el('custFeed').classList.remove('off');
+  }
+
+  function hangup(){
+    if (current) post('hangup', null, current.from);
+    current = null;
+    teardown();
+  }
+
+  function setMic(on){ mic?.getAudioTracks().forEach(t => t.enabled = on); }
+  function useCamera(s){ tx('video')?.sender.replaceTrack(s?.getVideoTracks()[0] || null).catch(() => {}); }
+  function send(type, data){ if (current) post(type, data, current.from); }
+  function restart(){ send('restart'); }
+
+  // C tile: what the customer receives (= our upload) and sends (= our download).
+  // A tile: our own download / upload.
+  async function paintStats(){
+    if (!pc) return;
+    let sent = 0, recv = 0;
+    (await pc.getStats()).forEach(r => {
+      if (r.type === 'outbound-rtp') sent += r.bytesSent || 0;
+      if (r.type === 'inbound-rtp')  recv += r.bytesReceived || 0;
+    });
+    const now = performance.now();
+    if (lastStats){
+      const secs = (now - lastStats.t) / 1000;
+      const up = Math.round((sent - lastStats.sent) * 8 / 1000 / secs);
+      const dn = Math.round((recv - lastStats.recv) * 8 / 1000 / secs);
+      el('dn1').textContent = up; el('up1').textContent = dn;
+      el('dn2').textContent = dn; el('up2').textContent = up;
+    }
+    lastStats = {t:now, sent, recv};
+  }
+
+  window.addEventListener('pagehide', () => { if (current) post('hangup', null, current.from); });
+
+  return {
+    connect, disconnect, next, accept, decline, hangup, setMic, useCamera, send, restart, paintStats,
+    get connected(){ return connected; },
+    get ringing(){ return !!ringing; },
+    get live(){ return !!current; },
+    get state(){ return pc?.connectionState || 'idle'; },
+    get meta(){ return current?.meta || null; },
+    get remote(){ return remote && remote.getTracks().length ? remote : null; }
+  };
+})();
+
+/* ---- initial paint ---- */
+paintRecv();
+resetSession();
+</script>
+</body>
+</html>

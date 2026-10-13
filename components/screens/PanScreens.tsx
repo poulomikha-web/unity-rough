@@ -5,6 +5,7 @@ import { useJourney } from '@/lib/JourneyContext';
 import { TIMING } from '@/lib/journey';
 import { attachStream, grabFrame } from '@/lib/useCamera';
 import { SecuredFooter, UniHeader } from '@/components/shared';
+import { asset } from '@/lib/asset';
 
 /** PAN — capture front. */
 export function PanFrontScreen() {
@@ -27,7 +28,7 @@ export function PanFrontScreen() {
         <div className="pan-cap-title">Capture PAN Card Front</div>
         <div className="pan-guide">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img className="pan-card-illus" src="/assets/pan-guide.png" alt="" />
+          <img className="pan-card-illus" src={asset('/assets/pan-guide.png')} alt="" />
         </div>
         <div className="doc-viewfinder pan-vf scanning">
           <video id="panVideoFront" autoPlay playsInline muted ref={videoRef} />
@@ -78,7 +79,7 @@ export function PanCapturedScreen() {
       <div className="doc-title-center green">Captured !</div>
       <div className="doc-doc-thumb">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img className="pan-card-illus" src="/assets/pan-captured.png" alt="" />
+        <img className="pan-card-illus" src={asset('/assets/pan-captured.png')} alt="" />
         <div className="mini-check">
           <svg viewBox="0 0 24 24">
             <path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />

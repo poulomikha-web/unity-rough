@@ -70,7 +70,8 @@ export const TIMING = {
   panVerified: 3600, // verify enter -> "Document Verified" + Continue
   verifyDuration: 6000, // "Verification in progress" hold
   waitCountdownFrom: 6, // estimated wait seconds on the success screen
-  connecting: 2600, // "Connecting to agent..." -> video call
+  connecting: 2600, // "Connecting to agent..." -> video call (demo)
+  liveConnectTimeout: 20000, // live call: give ICE this long before showing the call anyway
   codeStepDelay: 3 * 60 * 1000, // call -> read-the-code (3 minutes)
   selfieFaceDetect: 2600, // selfie modal: detect face
   selfieRetakeDetect: 2000, // after retake

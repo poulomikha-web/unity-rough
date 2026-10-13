@@ -2,6 +2,7 @@
 
 import { useJourney } from '@/lib/JourneyContext';
 import { SecuredFooter, UniHeader } from '@/components/shared';
+import { asset } from '@/lib/asset';
 
 const WARNING = (
   <div className="ob-instructions">
@@ -31,7 +32,7 @@ export function ObInternetScreen() {
         <div className="ob-center">
           <div className="ob-ring-wrap net-img-wrap">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img className="ob-halftone-img" src="/assets/net-checking.png" alt="" />
+            <img className="ob-halftone-img" src={asset('/assets/net-checking.png')} alt="" />
             <div className="net-spin-ring" />
             <svg className="net-wifi" viewBox="0 0 24 24">
               <path d="M1 9l2 2c4.97-4.97 13.03-4.97 18 0l2-2C16.93 2.93 7.08 2.93 1 9zm8 8l3 3 3-3c-1.65-1.66-4.34-1.66-6 0zm-4-4l2 2c2.76-2.76 7.24-2.76 10 0l2-2C15.14 9.14 8.87 9.14 5 13z" />
@@ -57,9 +58,9 @@ export function ObStrongScreen() {
         <div className="ob-center">
           <div className="ob-ring-wrap net-img-wrap">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img className="ob-halftone-img" src="/assets/net-strong.png" alt="" />
+            <img className="ob-halftone-img" src={asset('/assets/net-strong.png')} alt="" />
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img className="ob-ring-img" src="/assets/net-ring.png" alt="" />
+            <img className="ob-ring-img" src={asset('/assets/net-ring.png')} alt="" />
           </div>
           <div className="ob-title green" style={{ marginTop: 44 }}>
             Strong Internet Connection

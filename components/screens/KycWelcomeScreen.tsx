@@ -2,6 +2,7 @@
 
 import { useJourney } from '@/lib/JourneyContext';
 import { SecuredFooter } from '@/components/shared';
+import { asset } from '@/lib/asset';
 
 /** SS1 — KYC welcome. "Accept & Proceed" kicks off the onboarding sequence. */
 export function KycWelcomeScreen() {
@@ -19,7 +20,7 @@ export function KycWelcomeScreen() {
         <div className="kyc-h1">Welcome to your KYC verification</div>
         <div className="kyc-illus-wrap">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img className="kyc-illus" src="/assets/kyc-welcome.png" alt="" />
+          <img className="kyc-illus" src={asset('/assets/kyc-welcome.png')} alt="" />
         </div>
         <div className="kyc-p">
           <span className="lead">

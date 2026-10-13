@@ -95,6 +95,43 @@ Bearer` makes PostgREST reject the `anon` role (RLS `42501`); apikey-only resolv
 to `anon`, which the policy allows. It also avoids the SDK's Node 22+ requirement.
 A failed/missing-config insert is logged and swallowed, never breaking the journey.
 
+## Live agent call (WebRTC)
+
+The waiting room connects the customer to a real agent in the agent console
+(`public/agent/index.html`) — locally at **http://localhost:3000/agent**, deployed at
+**https://poulomikha-web.github.io/unity-rough/agent/**.
+
+1. Open the agent console and switch **Online**.
+2. Run the journey in another tab/device. On the waiting screen the customer joins the queue.
+3. The agent console rings (auto-accepts after 9 s). Both sides get two-way video + audio.
+4. In the agent console, **Generate code** (task 3) pushes the digits to the customer's
+   read-the-code screen. Either side hanging up ends the call on the other.
+
+How it works — no server of our own:
+
+- **Signaling = Supabase Realtime broadcast** on the `unity-svc-call` topic of the same
+  unity-rough project, over a plain WebSocket (`lib/realtime.ts`; the console has the same
+  ~30 lines inline). Peers broadcast `{type, from, to?, data}` and ignore messages for others.
+- Customer (`lib/useAgentCall.ts`) re-broadcasts `ring` every 3 s while queued; online agents
+  reply `ring-ack` (no ack in 2.5 s → the original simulated call). The first agent `accept`
+  wins and the customer announces `accepted` so the others drop the ring. The customer then
+  sends its journey selfie + PAN (`journey`) privately to that agent and makes the WebRTC offer;
+  `answer` / `ice` / `code` / `restart` / `hangup` follow.
+- Agents expire a ring not repeated for 9 s. A peer whose tab closes without saying goodbye is
+  detected when the RTCPeerConnection goes `failed`.
+- The console reads the Supabase URL + publishable key from `svc-config.js`, generated from
+  `.env.local` by `scripts/gen-svc-config.mjs` (runs before `dev` / `build`; gitignored).
+
+Deploy (GitHub Pages, static export with base path `/unity-rough`):
+
+```bash
+npm run build:pages     # → out/
+```
+
+then publish `out/` to the `gh-pages` branch. Only STUN is configured; peers behind strict NAT
+need a TURN server (`ICE_SERVERS` in `useAgentCall.ts`, `ICE` in the console). Camera/mic need
+a secure context (`localhost` or HTTPS — GitHub Pages is HTTPS).
+
 ## Notes on fidelity
 
 - **Images**: the prototype embedded its illustrations as base64. They've been extracted to

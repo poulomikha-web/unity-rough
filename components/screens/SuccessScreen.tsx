@@ -1,28 +1,50 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useJourney } from '@/lib/JourneyContext';
 import { TIMING } from '@/lib/journey';
 import { CamVideo, SecuredFooter } from '@/components/shared';
 
-/** Waiting-for-agent screen with an estimated-wait countdown + hold music. */
+/**
+ * Waiting-for-agent screen with an estimated-wait countdown + hold music.
+ *
+ * On entry the customer joins the live agent queue. If an agent console is
+ * online we stay here until an agent accepts (the accept moves us to
+ * "connecting"); otherwise the countdown runs out into the simulated call.
+ */
 export function SuccessScreen() {
-  const { go, restart, holdMusic } = useJourney();
+  const { go, restart, holdMusic, ringAgent, call } = useJourney();
   const [secs, setSecs] = useState<number>(TIMING.waitCountdownFrom);
+  // null = still asking the signaling server; 0 = nobody online (demo call).
+  const agentsRef = useRef<number | null>(null);
+  const [liveQueue, setLiveQueue] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
     let s = TIMING.waitCountdownFrom;
     setSecs(s);
     holdMusic.startHold();
+
+    void ringAgent().then((n) => {
+      if (cancelled) return;
+      agentsRef.current = n;
+      setLiveQueue(n > 0);
+    });
+
     const tick = setInterval(() => {
       s -= 1;
       setSecs(Math.max(s, 0));
-      if (s <= 0) {
+      // Live queue: keep holding until an agent accepts. Demo: carry on.
+      if (s <= 0 && agentsRef.current === 0) {
         clearInterval(tick);
+        call.cancel();
         go('connecting');
       }
     }, 1000);
-    return () => clearInterval(tick);
+    return () => {
+      cancelled = true;
+      clearInterval(tick);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -32,7 +54,7 @@ export function SuccessScreen() {
         <div className="wait-eta">
           <span>Estimated wait time</span>
           <span className="wait-sep">|</span>
-          <span id="waitSecs">{secs} s</span>
+          <span id="waitSecs">{liveQueue && secs === 0 ? 'Agent joining shortly' : `${secs} s`}</span>
         </div>
       </div>
       <div className="wait-video-wrap">
