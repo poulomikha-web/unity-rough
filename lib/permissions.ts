@@ -84,3 +84,44 @@ export const PERM_LABEL: Record<PermKind, string> = {
   camera: 'camera',
   microphone: 'microphone',
 };
+
+/**
+ * Query the device's current permission state via the Permissions API so we can
+ * skip prompting when it's already granted. Returns 'unsupported' when the
+ * browser can't answer (e.g. Safari/Firefox don't expose camera/microphone).
+ */
+export async function checkPermission(
+  kind: PermKind
+): Promise<PermissionState | 'unsupported'> {
+  try {
+    if (typeof navigator === 'undefined' || !navigator.permissions?.query) {
+      return 'unsupported';
+    }
+    const name = (kind === 'location' ? 'geolocation' : kind) as PermissionName;
+    const status = await navigator.permissions.query({ name });
+    return status.state;
+  } catch {
+    // Some browsers throw for camera/microphone names.
+    return 'unsupported';
+  }
+}
+
+// Remember a prior grant so we can still skip the in-app prompt on browsers
+// where the Permissions API can't report camera/microphone state.
+const flagKey = (kind: PermKind) => `unity_perm_${kind}`;
+
+export function rememberGranted(kind: PermKind): void {
+  try {
+    localStorage.setItem(flagKey(kind), 'granted');
+  } catch {
+    /* storage unavailable — ignore */
+  }
+}
+
+export function wasGranted(kind: PermKind): boolean {
+  try {
+    return localStorage.getItem(flagKey(kind)) === 'granted';
+  } catch {
+    return false;
+  }
+}

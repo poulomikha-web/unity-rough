@@ -70,6 +70,12 @@ browser permission prompt:
 | Camera   | `getUserMedia({ video })`             | granted (stream is reused for all video feeds) |
 | Mic      | `getUserMedia({ audio })`             | granted |
 
+**Ask once:** before each step the app checks the device's permission state via the
+Permissions API. If it's already `granted` (remembered by the browser from a previous
+run), the step auto-skips silently — no in-app popup and no second native prompt — and
+the camera stream is re-acquired without interrupting the user. Only not-yet-granted
+permissions are prompted for.
+
 When onboarding finishes, one row is inserted into the **`unity_rough`** table
 (`lib/supabase.ts`) with: `session_id`, `camera_granted`, `microphone_granted`,
 `location_granted`, `latitude`, `longitude`, `accuracy`, `user_agent`.

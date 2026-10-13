@@ -12,10 +12,13 @@ import {
 } from 'react';
 import { OB_SEQUENCE, PERM_INFO, type PermKind, type Screen } from './journey';
 import {
+  checkPermission,
   emptyPermResults,
+  rememberGranted,
   requestCamera,
   requestLocation,
   requestMicrophone,
+  wasGranted,
   type PermResults,
 } from './permissions';
 import { saveUnityRough } from './supabase';
@@ -131,58 +134,61 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
     advanceOnboard();
   }, [advanceOnboard]);
 
-  // "Allow" / "Deny" on the in-app prompt. Allow triggers the REAL browser
-  // permission request (native OS prompt) for the current step's kind.
+  // Perform (allow) or record a denial for one permission. When allowed and the
+  // device hasn't granted it yet this triggers the real native prompt; when the
+  // device already granted it, the underlying API resolves silently (no prompt).
+  const recordPermission = useCallback(async (kind: PermKind, allow: boolean) => {
+    const results = permResultsRef.current;
+    if (allow) {
+      if (kind === 'camera') {
+        const { granted, stream: s } = await requestCamera();
+        if (s) {
+          streamRef.current = s;
+          setStream(s);
+        }
+        setCamFailed(!granted);
+        results.camera = granted;
+        if (granted) rememberGranted('camera');
+      } else if (kind === 'microphone') {
+        const g = (await requestMicrophone()).granted;
+        results.microphone = g;
+        if (g) rememberGranted('microphone');
+      } else if (kind === 'location') {
+        const r = await requestLocation();
+        results.location = r.granted;
+        results.latitude = r.latitude;
+        results.longitude = r.longitude;
+        results.accuracy = r.accuracy;
+        if (r.granted) rememberGranted('location');
+      }
+    } else {
+      if (kind === 'camera') {
+        results.camera = false;
+        setCamFailed(true);
+      } else if (kind === 'microphone') {
+        results.microphone = false;
+      } else if (kind === 'location') {
+        results.location = false;
+      }
+    }
+  }, []);
+
+  // "Allow" / "Deny" on the in-app prompt.
   const permRespond = useCallback(
     async (allow: boolean) => {
       setPermPopup({ open: false, kind: null });
-      const step = OB_SEQUENCE[obIndex];
-      const kind = step?.perm;
-      const results = permResultsRef.current;
-
-      if (!kind) {
-        advanceOnboard();
-        return;
-      }
-
-      if (allow) {
-        if (kind === 'camera') {
-          const { granted, stream: s } = await requestCamera();
-          if (s) {
-            streamRef.current = s;
-            setStream(s);
-          }
-          setCamFailed(!granted);
-          results.camera = granted;
-        } else if (kind === 'microphone') {
-          results.microphone = (await requestMicrophone()).granted;
-        } else if (kind === 'location') {
-          const r = await requestLocation();
-          results.location = r.granted;
-          results.latitude = r.latitude;
-          results.longitude = r.longitude;
-          results.accuracy = r.accuracy;
-        }
-      } else {
-        if (kind === 'camera') {
-          results.camera = false;
-          setCamFailed(true);
-        } else if (kind === 'microphone') {
-          results.microphone = false;
-        } else if (kind === 'location') {
-          results.location = false;
-        }
-      }
-
+      const kind = OB_SEQUENCE[obIndex]?.perm;
+      if (kind) await recordPermission(kind, allow);
       advanceOnboard();
     },
-    [obIndex, advanceOnboard]
+    [obIndex, advanceOnboard, recordPermission]
   );
 
   // Drive the onboarding sequence whenever the index changes.
   useEffect(() => {
     if (obIndex < 0) return;
     clearObTimers();
+    let cancelled = false;
 
     if (obIndex >= OB_SEQUENCE.length) {
       setObIndex(-1);
@@ -206,14 +212,30 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
 
     if (step.perm) {
       const kind = step.perm;
-      permTimer.current = setTimeout(() => setPermPopup({ open: true, kind }), 450);
+      // Only prompt when the device hasn't already granted it. If it's granted
+      // (or we granted it before on a browser that can't report state), acquire
+      // silently and move on — no popup, no second native prompt.
+      (async () => {
+        const state = await checkPermission(kind);
+        if (cancelled) return;
+        const alreadyGranted = state === 'granted' || (state === 'unsupported' && wasGranted(kind));
+        if (alreadyGranted) {
+          await recordPermission(kind, true);
+          if (!cancelled) advanceOnboard();
+        } else {
+          permTimer.current = setTimeout(() => setPermPopup({ open: true, kind }), 450);
+        }
+      })();
     } else if (step.dur != null) {
       obTimer.current = setTimeout(() => advanceOnboard(), step.dur);
     }
     // dur === null && no perm => obPermIntro, waits for obProceed()
 
-    return clearObTimers;
-  }, [obIndex, advanceOnboard, clearObTimers]);
+    return () => {
+      cancelled = true;
+      clearObTimers();
+    };
+  }, [obIndex, advanceOnboard, clearObTimers, recordPermission]);
 
   const restart = useCallback(() => {
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
