@@ -2,7 +2,7 @@
   "name": "unity-svc-app",
   "version": "0.1.0",
   "private": true,
-  "description": "SBI Life / IDfy Self Video KYC (SVC) journey \u2014 Next.js rebuild of the HTML prototype",
+  "description": "SBI Life / IDfy Self Video KYC (SVC) journey — Next.js rebuild of the HTML prototype",
   "scripts": {
     "predev": "node scripts/gen-svc-config.mjs",
     "dev": "next dev",
@@ -13,6 +13,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@mediapipe/tasks-vision": "1.1.0",
     "next": "14.2.15",
     "react": "18.3.1",
     "react-dom": "18.3.1"

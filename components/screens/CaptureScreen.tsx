@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useJourney } from '@/lib/JourneyContext';
 import { TIMING } from '@/lib/journey';
 import { attachStream, grabFrame } from '@/lib/useCamera';
+import { FACE_MESSAGES, useFaceInOval } from '@/lib/useFaceInOval';
 import { SecuredFooter, UniHeader } from '@/components/shared';
 
 /** SS2 — Capture selfie, plus the full-screen selfie camera modal (SS3). */
@@ -12,12 +13,24 @@ export function CaptureScreen() {
 
   const captureVideoRef = useRef<HTMLVideoElement>(null);
   const selfieVideoRef = useRef<HTMLVideoElement>(null);
+  const ovalRef = useRef<HTMLDivElement>(null);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [view, setView] = useState<'live' | 'preview'>('live');
-  const [faceReady, setFaceReady] = useState(false);
   const [tempUrl, setTempUrl] = useState<string | null>(null);
-  const detectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Green oval + shutter only while exactly one face sits fully inside the oval.
+  const faceStatus = useFaceInOval(selfieVideoRef, ovalRef, modalOpen && view === 'live');
+  // If the detector can't load (offline / old browser), fall back to the
+  // prototype's timed "detection" so the journey never gets stuck.
+  const [fallbackReady, setFallbackReady] = useState(false);
+  useEffect(() => {
+    setFallbackReady(false);
+    if (faceStatus !== 'unavailable') return;
+    const t = setTimeout(() => setFallbackReady(true), TIMING.selfieFaceDetect);
+    return () => clearTimeout(t);
+  }, [faceStatus]);
+  const faceReady = faceStatus === 'ok' || (faceStatus === 'unavailable' && fallbackReady);
 
   useEffect(() => {
     attachStream(captureVideoRef.current, camera.stream);
@@ -26,22 +39,12 @@ export function CaptureScreen() {
     if (modalOpen) attachStream(selfieVideoRef.current, camera.stream);
   }, [camera.stream, modalOpen, view]);
 
-  const scheduleDetect = (ms: number) => {
-    setFaceReady(false);
-    if (detectTimer.current) clearTimeout(detectTimer.current);
-    detectTimer.current = setTimeout(() => setFaceReady(true), ms);
-  };
-
   const openModal = () => {
     setModalOpen(true);
     setView('live');
-    scheduleDetect(TIMING.selfieFaceDetect);
   };
 
-  const closeModal = () => {
-    if (detectTimer.current) clearTimeout(detectTimer.current);
-    setModalOpen(false);
-  };
+  const closeModal = () => setModalOpen(false);
 
   const captureSelfie = () => {
     if (!faceReady) return;
@@ -50,10 +53,7 @@ export function CaptureScreen() {
     setView('preview');
   };
 
-  const retakeSelfie = () => {
-    setView('live');
-    scheduleDetect(TIMING.selfieRetakeDetect);
-  };
+  const retakeSelfie = () => setView('live');
 
   const doneSelfie = () => {
     setSelfieUrl(tempUrl);
@@ -61,10 +61,6 @@ export function CaptureScreen() {
   };
 
   const removeSelfie = () => setSelfieUrl(null);
-
-  useEffect(() => () => {
-    if (detectTimer.current) clearTimeout(detectTimer.current);
-  }, []);
 
   return (
     <>
@@ -101,19 +97,21 @@ export function CaptureScreen() {
             <div className="capture-thumb-wrap">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img id="captureThumb" alt="Captured selfie" src={selfieUrl ?? undefined} />
+            </div>
+            <div className="capture-result-actions">
               <button className="retake-img-btn" onClick={openModal}>
                 <svg viewBox="0 0 24 24">
                   <path d="M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z" />
                 </svg>
-                Retake Image
+                Retake
+              </button>
+              <button className="remove-btn" onClick={removeSelfie}>
+                <svg viewBox="0 0 24 24">
+                  <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" />
+                </svg>
+                Remove
               </button>
             </div>
-            <button className="remove-btn" onClick={removeSelfie}>
-              <svg viewBox="0 0 24 24">
-                <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" />
-              </svg>
-              Remove
-            </button>
           </div>
 
           <button
@@ -142,7 +140,7 @@ export function CaptureScreen() {
         <div className="selfie-live" id="selfieLive" style={{ display: view === 'live' ? 'flex' : 'none' }}>
           <div className="selfie-cam">
             <video id="selfieVideo" autoPlay playsInline muted ref={selfieVideoRef} />
-            <div className={`selfie-oval${faceReady ? ' detected' : ''}`} id="selfieOval" />
+            <div className={`selfie-oval${faceReady ? ' detected' : ''}`} id="selfieOval" ref={ovalRef} />
             <div className={`selfie-status ${faceReady ? 'ok' : 'err'}`} id="selfieStatus">
               {faceReady ? (
                 <svg id="selfieStatusIcon" viewBox="0 0 24 24">
@@ -153,7 +151,9 @@ export function CaptureScreen() {
                   <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" />
                 </svg>
               )}
-              <span id="selfieStatusText">{faceReady ? 'Ready to Capture' : "Can't Detect Face"}</span>
+              <span id="selfieStatusText">
+                {faceReady ? FACE_MESSAGES.ok : FACE_MESSAGES[faceStatus === 'unavailable' ? 'loading' : faceStatus]}
+              </span>
             </div>
           </div>
           <div className="selfie-shutter-bar">
@@ -161,6 +161,7 @@ export function CaptureScreen() {
               className={`selfie-shutter${faceReady ? ' ready' : ''}`}
               id="selfieShutter"
               onClick={captureSelfie}
+              disabled={!faceReady}
               aria-label="Capture"
             />
           </div>

@@ -72,7 +72,6 @@ export const TIMING = {
   liveConnectTimeout: 20000, // live call: give ICE this long before showing the call anyway
   codeStepDelay: 3 * 60 * 1000, // call -> read-the-code (3 minutes)
   selfieFaceDetect: 2600, // selfie modal: detect face
-  selfieRetakeDetect: 2000, // after retake
 } as const;
 
 export const CIRCUMFERENCE = 2 * Math.PI * 32; // consent timer ring, r=32
