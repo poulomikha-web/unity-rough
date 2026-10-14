@@ -2538,6 +2538,19 @@
   .pb-icon svg { width: 28px; height: 28px; fill: #d63333; }
   .pb-title { font-size: 19px; font-weight: 700; color: #1d2230; }
   .pb-body { font-size: 14.5px; line-height: 1.5; color: #4a5162; margin: 8px 0 0; }
+  .pb-perms {
+    align-self: stretch; list-style: none; margin: 14px 0 0; padding: 0;
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .pb-perm {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 12px; border-radius: 10px; background: #f4f6fa;
+    font-size: 14.5px; font-weight: 600; color: #2b3140;
+  }
+  .pb-perm svg { width: 18px; height: 18px; fill: #5f6672; }
+  .pb-perm em { margin-left: auto; font-style: normal; font-size: 13px; font-weight: 600; padding: 3px 10px; border-radius: 99px; background: #e6e9f0; color: #5f6672; }
+  .pb-perm.denied em { background: #fdecea; color: #c62828; }
+  .pb-perm.granted em { background: #e3f4e6; color: #2e7d32; }
   .pb-steps {
     align-self: stretch; text-align: left;
     margin: 14px 0 0; padding: 12px 14px 12px 34px;

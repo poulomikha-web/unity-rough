@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { watchPermissions, type PermStates } from '@/lib/permissions';
 import { useJourney } from '@/lib/JourneyContext';
 import type { PermKind } from '@/lib/journey';
 import { SecuredFooter, UniHeader } from '@/components/shared';
@@ -274,29 +275,25 @@ function detectPlatform(): Platform {
   return 'desktop';
 }
 
-/** Where to flip a blocked site permission back on, per platform. */
-function settingsSteps(name: string, platform: Platform): string[] {
+const joinNames = (names: string[]) =>
+  names.length <= 1 ? names.join('') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+
+/** Where to flip blocked site permissions back on, per platform (wording matches the browser UI). */
+function settingsSteps(names: string, platform: Platform, live: boolean): string[] {
+  const last = live ? "Come back here — we'll continue automatically" : 'Come back here and tap Try again';
   if (platform === 'ios')
-    return [
-      'Tap "aA" (or the page icon) in the address bar',
-      `Choose Website Settings → ${name} → Allow`,
-      'Come back here and tap Try again',
-    ];
+    return ['Tap "aA" in the address bar → Website Settings', `Set ${names} to Allow`, last];
   if (platform === 'android')
-    return [
-      'Tap the icon on the left of the address bar',
-      `Open Permissions and turn ${name} on`,
-      'Come back here and tap Try again',
-    ];
+    return ['Tap the tune icon at the left of the address bar', `Tap Permissions and turn on ${names}`, last];
   return [
-    'Click the icon on the left of the address bar',
-    `Set ${name} to Allow`,
-    'Reload the page if asked, then try again',
+    'Click the tune icon at the left of the address bar',
+    `Switch on ${names} — or click "Reset permissions"`,
+    live ? "We'll continue automatically (reload the page if Chrome asks)" : 'Reload the page if asked, then click Try again',
   ];
 }
 
 /** Title, explanation and fix-it steps for one failed permission. */
-function blockedCopy(kind: PermKind, reason: string, platform: Platform) {
+function blockedCopy(kind: PermKind, reason: string, platform: Platform, blockedNames: string[], live: boolean) {
   const name = PERM_NAME[kind];
   const lower = name.toLowerCase();
   switch (reason) {
@@ -310,15 +307,19 @@ function blockedCopy(kind: PermKind, reason: string, platform: Platform) {
     case 'NotAllowedError':
     case 'SecurityError':
     case 'PERMISSION_DENIED':
+    {
+      // Name every blocked permission so they're all fixed in one visit.
+      const names = blockedNames.length ? blockedNames : [name];
+      const steps = settingsSteps(joinNames(names), platform, live);
+      if (names.includes('Location') && platform !== 'desktop')
+        steps.splice(2, 0, 'Also make sure Location is on in your phone settings');
       return {
-        title: `${name} access is blocked`,
-        body: `Your browser is blocking ${lower} access for this site, so it won't ask again. Turn it back on:`,
-        steps:
-          kind === 'location' && platform !== 'desktop'
-            ? [...settingsSteps(name, platform).slice(0, 2), 'Also check Location is on in your phone settings', 'Come back here and tap Try again']
-            : settingsSteps(name, platform),
+        title: names.length > 1 ? 'Allow access to continue' : `${name} access is blocked`,
+        body: `Your browser is blocking ${joinNames(names.map((n) => n.toLowerCase()))} for this site, so it can't ask you again. Video KYC needs ${names.length > 1 ? 'all of them' : 'it'}:`,
+        steps,
         cta: 'Try again',
       };
+    }
     case 'NotReadableError':
     case 'AbortError':
     case 'TrackStartError':
@@ -367,14 +368,16 @@ function blockedCopy(kind: PermKind, reason: string, platform: Platform) {
  * Shown when a permission step fails. The journey stays on that step until
  * access is granted — camera, microphone and location are all required.
  */
+const BLOCKED_REASONS = ['NotAllowedError', 'SecurityError', 'PERMISSION_DENIED'];
+
 export function PermBlockedSheet() {
   const { permBlocked, permRetry, permInfo } = useJourney();
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
-  if (!permBlocked) return null;
+  const [states, setStates] = useState<PermStates | null>(null);
+  const isBlockedReason = !!permBlocked && BLOCKED_REASONS.includes(permBlocked.reason);
+  const kind = permBlocked?.kind;
 
-  const platform = detectPlatform();
-  const copy = blockedCopy(permBlocked.kind, permBlocked.reason, platform);
   const retry = async () => {
     setBusy(true);
     try {
@@ -383,6 +386,34 @@ export function PermBlockedSheet() {
       setBusy(false);
     }
   };
+  const retryRef = useRef(retry);
+  retryRef.current = retry;
+
+  // Live permission states while blocked: the user flips the switches in the
+  // browser's site settings and we carry on by ourselves.
+  useEffect(() => {
+    if (!isBlockedReason || !kind) {
+      setStates(null);
+      return;
+    }
+    let prev: PermissionState | 'unsupported' | undefined;
+    return watchPermissions((next) => {
+      setStates(next);
+      const now = next[kind];
+      if (prev === 'denied' && (now === 'granted' || now === 'prompt')) void retryRef.current();
+      prev = now;
+    });
+  }, [isBlockedReason, kind]);
+
+  if (!permBlocked) return null;
+
+  const platform = detectPlatform();
+  const live = !!states && states[permBlocked.kind] !== 'unsupported';
+  const blockedNames = states
+    ? (Object.keys(PERM_NAME) as PermKind[]).filter((k) => states[k] === 'denied').map((k) => PERM_NAME[k])
+    : [];
+  if (isBlockedReason && !blockedNames.includes(PERM_NAME[permBlocked.kind])) blockedNames.unshift(PERM_NAME[permBlocked.kind]);
+  const copy = blockedCopy(permBlocked.kind, permBlocked.reason, platform, blockedNames, live);
   const copyLink = async () => {
     try {
       await navigator.clipboard.writeText(window.location.href);
@@ -405,6 +436,23 @@ export function PermBlockedSheet() {
           {copy.title}
         </div>
         <p className="pb-body">{copy.body}</p>
+        {isBlockedReason && states && (
+          <ul className="pb-perms">
+            {(Object.keys(PERM_NAME) as PermKind[]).map((k) => {
+              const st = states[k];
+              const label = st === 'granted' ? 'Allowed' : st === 'denied' ? 'Blocked' : st === 'prompt' ? 'Will ask' : '—';
+              return (
+                <li key={k} className={`pb-perm ${st}`}>
+                  <svg viewBox="0 0 24 24">
+                    <path d={permInfo[k].icon} />
+                  </svg>
+                  <span>{PERM_NAME[k]}</span>
+                  <em>{label}</em>
+                </li>
+              );
+            })}
+          </ul>
+        )}
         {copy.steps.length > 0 && (
           <ol className="pb-steps">
             {copy.steps.map((s) => (

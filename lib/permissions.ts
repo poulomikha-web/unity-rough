@@ -146,3 +146,40 @@ export function wasGranted(kind: PermKind): boolean {
     return false;
   }
 }
+
+export type PermStates = Record<PermKind, PermissionState | 'unsupported'>;
+const ALL_KINDS: PermKind[] = ['location', 'camera', 'microphone'];
+
+/**
+ * Report the browser's permission state for location, camera and microphone,
+ * and again whenever the user flips one in the browser's site settings (the
+ * Permissions API fires `change`). Returns an unsubscribe function.
+ */
+export function watchPermissions(onChange: (states: PermStates) => void): () => void {
+  const states = {} as PermStates;
+  const statuses: PermissionStatus[] = [];
+  let stopped = false;
+  const emit = () => !stopped && onChange({ ...states });
+
+  void Promise.all(
+    ALL_KINDS.map(async (kind) => {
+      try {
+        const name = (kind === 'location' ? 'geolocation' : kind) as PermissionName;
+        const status = await navigator.permissions.query({ name });
+        states[kind] = status.state;
+        status.onchange = () => {
+          states[kind] = status.state;
+          emit();
+        };
+        statuses.push(status);
+      } catch {
+        states[kind] = 'unsupported';
+      }
+    })
+  ).then(emit);
+
+  return () => {
+    stopped = true;
+    statuses.forEach((s) => (s.onchange = null));
+  };
+}
