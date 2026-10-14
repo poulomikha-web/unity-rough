@@ -1,0 +1,1 @@
+window.SVC_CONFIG = {"supabaseUrl":"https://tdvxgnhtblwljgbolwvq.supabase.co","supabaseKey":"sb_publishable_P46FZOdYMV29e0xboTO2eA_N3VB6g9i","turnUrls":["turn:free.expressturn.com:3478","turn:free.expressturn.com:3478?transport=tcp"],"turnUsername":"000000002107271455","turnCredential":"2uMZmMtBqpIToqOtYzCI8j5xCug="};
