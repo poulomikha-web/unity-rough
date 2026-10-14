@@ -56,6 +56,23 @@ async function ensureBucket(): Promise<void> {
   }
 }
 
+/**
+ * Keep eve's exact response next to the image (<session>/<task>.json) so a
+ * journey's result can be read back later. Never fails the request.
+ */
+async function saveResponse(path: string, record: unknown): Promise<void> {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/storage/v1/object/${BUCKET}/${path}`, {
+      method: 'POST',
+      headers: storageHeaders({ 'Content-Type': 'application/json', 'x-upsert': 'true' }),
+      body: JSON.stringify(record, null, 2),
+    });
+    if (!res.ok) console.warn('[validate-pan] save response failed', res.status, await res.text());
+  } catch (err) {
+    console.warn('[validate-pan] save response threw', err);
+  }
+}
+
 /** Upload the image and return a signed URL eve can fetch. */
 async function storeAndSign(bytes: Uint8Array, contentType: string, path: string): Promise<string> {
   const upload = () =>
@@ -140,8 +157,16 @@ Deno.serve(async (req) => {
       }),
     });
     const out = await eve.json().catch(() => ({}));
+    const verdict = eve.ok && out.status === 'completed' ? evaluateAdvancedFeatures(out.result) : null;
+    await saveResponse(`${sessionId}/${taskId}.json`, {
+      at: new Date().toISOString(),
+      request: { task_id: taskId, group_id: groupId, doc_type: 'ind_pan' },
+      http_status: eve.status,
+      verdict,
+      response: out,
+    });
 
-    if (!eve.ok || out.status !== 'completed') {
+    if (!verdict) {
       // e.g. 422 INVALID_IMAGE (too small / unreadable) — the customer retakes.
       console.warn('[validate-pan] eve error', eve.status, JSON.stringify(out));
       return reply(200, {
@@ -154,7 +179,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    const verdict = evaluateAdvancedFeatures(out.result);
     return reply(200, { ...verdict, task_id: taskId, group_id: groupId, request_id: out.request_id, result: out.result });
   } catch (err) {
     console.error('[validate-pan]', err);
