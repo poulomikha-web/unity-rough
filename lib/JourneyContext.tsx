@@ -66,7 +66,7 @@ interface JourneyValue {
   /** "Try again" on the blocked sheet; resolves when the attempt finishes. */
   permRetry: () => Promise<void>;
 
-  /** Current journey session id (a UUID); also the eve group_id. */
+  /** Current journey session id (a UUID); folder for stored captures. */
   getSessionId: () => string;
 
   // Shared capture artefacts

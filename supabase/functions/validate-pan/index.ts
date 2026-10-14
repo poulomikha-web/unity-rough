@@ -117,7 +117,10 @@ Deno.serve(async (req) => {
   if (img.bytes.length > MAX_IMAGE_BYTES) return reply(413, { ok: false, error: 'IMAGE_TOO_LARGE' });
 
   const sessionId = typeof body.session_id === 'string' && UUID_RE.test(body.session_id) ? body.session_id : crypto.randomUUID();
+  // Fresh eve ids on every click (retakes included); the session id only
+  // groups the stored images.
   const taskId = crypto.randomUUID();
+  const groupId = crypto.randomUUID();
   const ext = img.contentType === 'image/png' ? 'png' : 'jpg';
 
   try {
@@ -128,7 +131,7 @@ Deno.serve(async (req) => {
       headers: { 'Content-Type': 'application/json', 'api-key': IDFY_API_KEY, 'account-id': IDFY_ACCOUNT_ID },
       body: JSON.stringify({
         task_id: taskId,
-        group_id: sessionId,
+        group_id: groupId,
         data: {
           document1: documentUrl,
           doc_type: 'ind_pan',
@@ -147,11 +150,12 @@ Deno.serve(async (req) => {
         error: out.error ?? `EVE_${eve.status}`,
         message: out.message ?? null,
         task_id: taskId,
+        group_id: groupId,
       });
     }
 
     const verdict = evaluateAdvancedFeatures(out.result);
-    return reply(200, { ...verdict, task_id: taskId, request_id: out.request_id, result: out.result });
+    return reply(200, { ...verdict, task_id: taskId, group_id: groupId, request_id: out.request_id, result: out.result });
   } catch (err) {
     console.error('[validate-pan]', err);
     return reply(502, { ok: false, failed: [], error: 'UPSTREAM_FAILED' });
