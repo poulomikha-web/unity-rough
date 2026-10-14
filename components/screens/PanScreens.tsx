@@ -6,6 +6,7 @@ import { TIMING } from '@/lib/journey';
 import { attachStream, grabFrame } from '@/lib/useCamera';
 import { SecuredFooter, UniHeader } from '@/components/shared';
 import { asset } from '@/lib/asset';
+import { PAN_FEATURE_MESSAGES, validatePan, type PanValidation } from '@/lib/validatePan';
 
 /** PAN — capture front. */
 export function PanFrontScreen() {
@@ -111,24 +112,52 @@ export function PanCapturedScreen() {
   );
 }
 
-type VerifyPhase = 'uploading' | 'verifying' | 'verified';
+type VerifyPhase = 'uploading' | 'verifying' | 'verified' | 'failed';
 
-/** PAN — verify: Uploading -> Verifying Document -> Document Verified -> Continue. */
+/** Errors that a plain retry may fix, as opposed to needing a new capture. */
+const TRANSIENT_ERRORS = new Set(['NETWORK', 'UPSTREAM_FAILED', 'NOT_CONFIGURED']);
+
+/**
+ * PAN — verify: Uploading -> Verifying Document -> Document Verified -> Continue.
+ * The captured frame is validated with IDfy eve (via the validate-pan edge
+ * function); if any advanced feature fails, one error lists every failure and
+ * the customer retakes the PAN.
+ */
 export function PanVerifyScreen() {
-  const { go, panFrontUrl } = useJourney();
+  const { go, panFrontUrl, getSessionId } = useJourney();
   const [phase, setPhase] = useState<VerifyPhase>('uploading');
+  const [failure, setFailure] = useState<PanValidation | null>(null);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
+    if (!panFrontUrl) return;
+    const ac = new AbortController();
     setPhase('uploading');
-    const t1 = setTimeout(() => setPhase('verifying'), TIMING.panUploading);
-    const t2 = setTimeout(() => setPhase('verified'), TIMING.panVerified);
-    return () => {
+    setFailure(null);
+    const t1 = setTimeout(() => setPhase((p) => (p === 'uploading' ? 'verifying' : p)), TIMING.panUploading);
+    // Keep the Uploading/Verifying states on screen for at least the old cadence.
+    const minShown = new Promise((r) => setTimeout(r, TIMING.panVerified));
+    Promise.all([validatePan(panFrontUrl, getSessionId(), ac.signal), minShown]).then(([res]) => {
+      if (ac.signal.aborted) return;
       clearTimeout(t1);
-      clearTimeout(t2);
+      if (res.ok) {
+        setPhase('verified');
+      } else {
+        setFailure(res);
+        setPhase('failed');
+      }
+    });
+    return () => {
+      ac.abort();
+      clearTimeout(t1);
     };
-  }, []);
+  }, [panFrontUrl, getSessionId, attempt]);
 
   const verified = phase === 'verified';
+  const failed = phase === 'failed';
+  const errCode = failure?.error ?? '';
+  const transient =
+    failed && failure?.failed.length === 0 && (TRANSIENT_ERRORS.has(errCode) || errCode.startsWith('HTTP_'));
 
   return (
     <div className="screen pan-verify-screen active" id="screenPanVerify">
@@ -136,13 +165,20 @@ export function PanVerifyScreen() {
         <div className="doc-title">Verify Capture</div>
       </div>
       <div className="doc-status-wrap">
-        <div className={`doc-pill${verified ? ' done' : ''}`} id="verifyPill">
+        <div className={`doc-pill${verified ? ' done' : ''}${failed ? ' fail' : ''}`} id="verifyPill">
           {verified ? (
             <>
               <svg className="mini-tick" viewBox="0 0 24 24">
                 <path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
               </svg>
               <span>Document Verified</span>
+            </>
+          ) : failed ? (
+            <>
+              <svg className="mini-tick" viewBox="0 0 24 24">
+                <path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+              </svg>
+              <span>Verification Failed</span>
             </>
           ) : (
             <>
@@ -153,7 +189,7 @@ export function PanVerifyScreen() {
         </div>
       </div>
       <div className="doc-label">PAN</div>
-      <div className={`doc-frame${verified ? ' ok' : ''}`} id="verifyFrame">
+      <div className={`doc-frame${verified ? ' ok' : ''}${failed ? ' bad' : ''}`} id="verifyFrame">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img id="verifyImg" alt="PAN capture" src={panFrontUrl ?? undefined} />
         {verified && (
@@ -164,15 +200,39 @@ export function PanVerifyScreen() {
           </div>
         )}
       </div>
+      {failed && failure && (
+        <div className="doc-error" id="panVerifyError" role="alert">
+          {failure.failed.length > 0 ? (
+            <>
+              We couldn&apos;t verify your PAN card:
+              <ul>
+                {failure.failed.map((f) => (
+                  <li key={f}>{PAN_FEATURE_MESSAGES[f]}</li>
+                ))}
+              </ul>
+            </>
+          ) : transient ? (
+            'We couldn\u2019t reach the verification service. Please check your connection and try again.'
+          ) : (
+            'We couldn\u2019t read this image. Please retake a clear photo of the front of your PAN card.'
+          )}
+        </div>
+      )}
       <div className="doc-spacer" />
-      <button
-        className="doc-continue"
-        id="panContinueBtn"
-        style={{ display: verified ? 'block' : 'none' }}
-        onClick={() => go('compare')}
-      >
-        Continue
-      </button>
+      {verified && (
+        <button className="doc-continue" id="panContinueBtn" onClick={() => go('compare')}>
+          Continue
+        </button>
+      )}
+      {failed && (
+        <button
+          className="doc-continue"
+          id="panRetakeBtn"
+          onClick={() => (transient ? setAttempt((n) => n + 1) : go('panFront'))}
+        >
+          {transient ? 'Try Again' : 'Retake PAN'}
+        </button>
+      )}
       <SecuredFooter variant="doc" />
     </div>
   );

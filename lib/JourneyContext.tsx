@@ -66,6 +66,9 @@ interface JourneyValue {
   /** "Try again" on the blocked sheet; resolves when the attempt finishes. */
   permRetry: () => Promise<void>;
 
+  /** Current journey session id (a UUID); also the eve group_id. */
+  getSessionId: () => string;
+
   // Shared capture artefacts
   selfieUrl: string | null;
   setSelfieUrl: (url: string | null) => void;
@@ -112,6 +115,7 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
   const restartRef = useRef<() => void>(() => {});
   const sessionIdRef = useRef<string>('');
   if (!sessionIdRef.current) sessionIdRef.current = newSessionId();
+  const getSessionId = useCallback(() => sessionIdRef.current, []);
 
   const obTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const permTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -348,6 +352,7 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
       permRespond,
       permBlocked,
       permRetry,
+      getSessionId,
       selfieUrl,
       setSelfieUrl,
       panFrontUrl,

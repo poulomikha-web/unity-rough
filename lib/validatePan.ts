@@ -1,0 +1,51 @@
+'use client';
+
+const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+export type PanFeature = 'face_details' | 'detect_doc_side' | 'check_scan';
+
+export interface PanValidation {
+  ok: boolean;
+  /** Advanced features that came back false (empty when eve itself errored). */
+  failed: PanFeature[];
+  /** eve / transport error code, e.g. INVALID_IMAGE, NETWORK. */
+  error?: string;
+  message?: string | null;
+}
+
+/** Customer-facing text for each failed advanced feature. */
+export const PAN_FEATURE_MESSAGES: Record<PanFeature, string> = {
+  face_details: 'Your photo on the PAN card is not clearly visible.',
+  detect_doc_side: 'Please capture the front side of your PAN card.',
+  check_scan: 'Please capture the original PAN card, not a scan or photocopy.',
+};
+
+/**
+ * Validate the captured PAN front via the `validate-pan` edge function, which
+ * stores the image, passes its signed URL to IDfy eve as `document1`
+ * (doc_type ind_pan) and checks every advanced_features result.
+ *
+ * Never throws: transport failures come back as `{ ok: false, error }`.
+ */
+export async function validatePan(image: string, sessionId: string, signal?: AbortSignal): Promise<PanValidation> {
+  if (!url || !anonKey) {
+    console.info('[validate-pan] Supabase not configured — skipping validation.');
+    return { ok: true, failed: [] };
+  }
+  try {
+    const res = await fetch(`${url}/functions/v1/validate-pan`, {
+      method: 'POST',
+      headers: { apikey: anonKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image, session_id: sessionId }),
+      signal,
+    });
+    const out = (await res.json().catch(() => null)) as PanValidation | null;
+    if (!out || typeof out.ok !== 'boolean') return { ok: false, failed: [], error: `HTTP_${res.status}` };
+    return { ok: out.ok, failed: out.failed ?? [], error: out.error, message: out.message };
+  } catch (err) {
+    if ((err as Error)?.name === 'AbortError') return { ok: false, failed: [], error: 'ABORTED' };
+    console.warn('[validate-pan] request failed:', err);
+    return { ok: false, failed: [], error: 'NETWORK' };
+  }
+}

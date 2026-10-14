@@ -2155,6 +2155,14 @@
     font-size: 15px; font-weight: 600;
   }
   .doc-pill.done { background: #2fa96a; }
+  .doc-pill.fail { background: #d64545; }
+  .doc-frame.bad { border-color: #d64545; }
+  .doc-error {
+    margin: 14px 22px 0; padding: 12px 14px; border-radius: 10px;
+    background: rgba(214,69,69,0.12); border: 1px solid rgba(214,69,69,0.5);
+    color: #ffd9d9; font-size: 14px; line-height: 1.45;
+  }
+  .doc-error ul { margin: 6px 0 0; padding-left: 18px; }
   .doc-pill .mini-spin {
     width: 15px; height: 15px; border-radius: 50%;
     border: 2.5px solid rgba(255,255,255,0.4); border-top-color:#fff;

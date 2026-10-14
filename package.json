@@ -10,7 +10,8 @@
     "build": "next build",
     "build:pages": "node scripts/gen-svc-config.mjs && PAGES=1 next build && touch out/.nojekyll",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test": "node --test supabase/functions/"
   },
   "dependencies": {
     "@mediapipe/tasks-vision": "1.1.0",
