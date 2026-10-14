@@ -5,6 +5,15 @@ const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 export type PanFeature = 'face_details' | 'detect_doc_side' | 'check_scan';
 
+/** PAN details read by eve OCR (extract/ind_pan). */
+export interface PanDetails {
+  name: string;
+  fathers_name: string;
+  date_of_birth: string;
+  pan_number: string;
+  pan_type: string;
+}
+
 export interface PanValidation {
   ok: boolean;
   /** Advanced features that came back false (empty when eve itself errored). */
@@ -12,6 +21,8 @@ export interface PanValidation {
   /** eve / transport error code, e.g. INVALID_IMAGE, NETWORK. */
   error?: string;
   message?: string | null;
+  /** Present when ok: what the OCR read off the card. */
+  pan_details?: PanDetails;
 }
 
 /** Customer-facing text for each failed advanced feature. */
@@ -42,7 +53,7 @@ export async function validatePan(image: string, sessionId: string, signal?: Abo
     });
     const out = (await res.json().catch(() => null)) as PanValidation | null;
     if (!out || typeof out.ok !== 'boolean') return { ok: false, failed: [], error: `HTTP_${res.status}` };
-    return { ok: out.ok, failed: out.failed ?? [], error: out.error, message: out.message };
+    return { ok: out.ok, failed: out.failed ?? [], error: out.error, message: out.message, pan_details: out.pan_details };
   } catch (err) {
     if ((err as Error)?.name === 'AbortError') return { ok: false, failed: [], error: 'ABORTED' };
     console.warn('[validate-pan] request failed:', err);

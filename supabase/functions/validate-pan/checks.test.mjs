@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { evaluateAdvancedFeatures } from './checks.mjs';
+import { evaluateAdvancedFeatures, pickPanDetails } from './checks.mjs';
 
 // Real `result` returned by eve validate/document for a good PAN front.
 const GOOD = {
@@ -36,4 +36,40 @@ test('missing fields count as failures, all reported together', () => {
     failed: ['face_details', 'detect_doc_side', 'check_scan'],
   });
   assert.equal(evaluateAdvancedFeatures(undefined).ok, false);
+});
+
+// Shape of eve's /v3/tasks/sync/extract/ind_pan response (values made up).
+const OCR = {
+  status: 'completed',
+  result: {
+    extraction_output: {
+      age: 41,
+      date_of_birth: '1985-01-31',
+      date_of_issue: '',
+      fathers_name: 'RAMESH KUMAR',
+      id_number: 'ABCDE1234F',
+      is_scanned: false,
+      minor: false,
+      name_on_card: 'SURESH KUMAR',
+      pan_type: 'Individual',
+    },
+  },
+};
+
+test('OCR output maps to PAN details', () => {
+  assert.deepEqual(pickPanDetails(OCR), {
+    name: 'SURESH KUMAR',
+    fathers_name: 'RAMESH KUMAR',
+    date_of_birth: '1985-01-31',
+    pan_number: 'ABCDE1234F',
+    pan_type: 'Individual',
+  });
+});
+
+test('OCR without a PAN number or name is not a success', () => {
+  const out = (o) => ({ ...OCR, result: { extraction_output: { ...OCR.result.extraction_output, ...o } } });
+  assert.equal(pickPanDetails(out({ id_number: '' })), null);
+  assert.equal(pickPanDetails(out({ name_on_card: '  ' })), null);
+  assert.equal(pickPanDetails({ status: 'failed' }), null);
+  assert.equal(pickPanDetails(undefined), null);
 });

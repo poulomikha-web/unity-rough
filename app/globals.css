@@ -2162,6 +2162,17 @@
     background: rgba(214,69,69,0.12); border: 1px solid rgba(214,69,69,0.5);
     color: #ffd9d9; font-size: 14px; line-height: 1.45;
   }
+  .pan-ocr {
+    margin: 14px 22px 0; padding: 4px 14px; border-radius: 10px;
+    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
+  }
+  .pan-ocr-row {
+    display: flex; justify-content: space-between; gap: 12px;
+    padding: 9px 0; font-size: 14px;
+  }
+  .pan-ocr-row + .pan-ocr-row { border-top: 1px solid rgba(255,255,255,0.08); }
+  .pan-ocr-label { color: rgba(255,255,255,0.6); flex-shrink: 0; }
+  .pan-ocr-value { color: #fff; font-weight: 600; text-align: right; word-break: break-word; }
   .doc-error ul { margin: 6px 0 0; padding-left: 18px; }
   .doc-pill .mini-spin {
     width: 15px; height: 15px; border-radius: 50%;

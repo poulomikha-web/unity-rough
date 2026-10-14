@@ -26,3 +26,29 @@ export function evaluateAdvancedFeatures(result) {
   if (r.is_scanned !== false) failed.push('check_scan');
   return { ok: failed.length === 0, failed };
 }
+
+/**
+ * @typedef {{ name: string, fathers_name: string, date_of_birth: string,
+ *   pan_number: string, pan_type: string }} PanDetails
+ */
+
+/**
+ * Pull the customer's PAN details out of eve's extract/ind_pan response.
+ * Returns null unless the task completed with at least a PAN number and name.
+ *
+ * @param {any} out
+ * @returns {PanDetails | null}
+ */
+export function pickPanDetails(out) {
+  if (out?.status !== 'completed') return null;
+  const x = out.result?.extraction_output ?? {};
+  const s = (v) => (typeof v === 'string' ? v.trim() : '');
+  const details = {
+    name: s(x.name_on_card),
+    fathers_name: s(x.fathers_name),
+    date_of_birth: s(x.date_of_birth),
+    pan_number: s(x.id_number),
+    pan_type: s(x.pan_type),
+  };
+  return details.name && details.pan_number ? details : null;
+}

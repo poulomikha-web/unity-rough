@@ -112,6 +112,15 @@ export function PanCapturedScreen() {
   );
 }
 
+function PanField({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="pan-ocr-row">
+      <span className="pan-ocr-label">{label}</span>
+      <span className="pan-ocr-value">{value || '\u2014'}</span>
+    </div>
+  );
+}
+
 type VerifyPhase = 'uploading' | 'verifying' | 'verified' | 'failed';
 
 /** Errors that a plain retry may fix, as opposed to needing a new capture. */
@@ -121,10 +130,10 @@ const TRANSIENT_ERRORS = new Set(['NETWORK', 'UPSTREAM_FAILED', 'NOT_CONFIGURED'
  * PAN — verify: Uploading -> Verifying Document -> Document Verified -> Continue.
  * The captured frame is validated with IDfy eve (via the validate-pan edge
  * function); if any advanced feature fails, one error lists every failure and
- * the customer retakes the PAN.
+ * the customer retakes the PAN. On success the OCR'd PAN details are shown.
  */
 export function PanVerifyScreen() {
-  const { go, panFrontUrl, getSessionId } = useJourney();
+  const { go, panFrontUrl, getSessionId, panDetails, setPanDetails } = useJourney();
   const [phase, setPhase] = useState<VerifyPhase>('uploading');
   const [failure, setFailure] = useState<PanValidation | null>(null);
   const [attempt, setAttempt] = useState(0);
@@ -134,6 +143,7 @@ export function PanVerifyScreen() {
     const ac = new AbortController();
     setPhase('uploading');
     setFailure(null);
+    setPanDetails(null);
     const t1 = setTimeout(() => setPhase((p) => (p === 'uploading' ? 'verifying' : p)), TIMING.panUploading);
     // Keep the Uploading/Verifying states on screen for at least the old cadence.
     const minShown = new Promise((r) => setTimeout(r, TIMING.panVerified));
@@ -141,6 +151,7 @@ export function PanVerifyScreen() {
       if (ac.signal.aborted) return;
       clearTimeout(t1);
       if (res.ok) {
+        setPanDetails(res.pan_details ?? null);
         setPhase('verified');
       } else {
         setFailure(res);
@@ -151,7 +162,7 @@ export function PanVerifyScreen() {
       ac.abort();
       clearTimeout(t1);
     };
-  }, [panFrontUrl, getSessionId, attempt]);
+  }, [panFrontUrl, getSessionId, setPanDetails, attempt]);
 
   const verified = phase === 'verified';
   const failed = phase === 'failed';
@@ -216,6 +227,14 @@ export function PanVerifyScreen() {
           ) : (
             'We couldn\u2019t read this image. Please retake a clear photo of the front of your PAN card.'
           )}
+        </div>
+      )}
+      {verified && panDetails && (
+        <div className="pan-ocr" id="panOcrDetails">
+          <PanField label="Name" value={panDetails.name} />
+          <PanField label="Father's Name" value={panDetails.fathers_name} />
+          <PanField label="Date of Birth" value={panDetails.date_of_birth} />
+          <PanField label="PAN Number" value={panDetails.pan_number} />
         </div>
       )}
       <div className="doc-spacer" />

@@ -22,6 +22,7 @@ import {
   type PermResults,
 } from './permissions';
 import { saveUnityRough } from './supabase';
+import type { PanDetails } from './validatePan';
 import { useHoldMusic } from './useHoldMusic';
 import { useAgentCall, type AgentCall } from './useAgentCall';
 
@@ -74,6 +75,9 @@ interface JourneyValue {
   setSelfieUrl: (url: string | null) => void;
   panFrontUrl: string | null;
   setPanFrontUrl: (url: string | null) => void;
+  /** PAN details from OCR, set once the PAN passes verification. */
+  panDetails: PanDetails | null;
+  setPanDetails: (d: PanDetails | null) => void;
 }
 
 const JourneyCtx = createContext<JourneyValue | null>(null);
@@ -109,6 +113,7 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
 
   const [selfieUrl, setSelfieUrl] = useState<string | null>(null);
   const [panFrontUrl, setPanFrontUrl] = useState<string | null>(null);
+  const [panDetails, setPanDetails] = useState<PanDetails | null>(null);
 
   // Collected across the permission steps; read when we persist to Supabase.
   const permResultsRef = useRef<PermResults>(emptyPermResults());
@@ -332,6 +337,7 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
     setPermBlocked(null);
     setSelfieUrl(null);
     setPanFrontUrl(null);
+    setPanDetails(null);
     setScreen('redirect');
   }, [holdMusic, call, clearObTimers, stopStream]);
   restartRef.current = restart;
@@ -357,6 +363,8 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
       setSelfieUrl,
       panFrontUrl,
       setPanFrontUrl,
+      panDetails,
+      setPanDetails,
     }),
     [
       screen,
@@ -375,6 +383,7 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
       permRetry,
       selfieUrl,
       panFrontUrl,
+      panDetails,
     ]
   );
 

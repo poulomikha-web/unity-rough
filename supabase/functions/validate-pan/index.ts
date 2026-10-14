@@ -7,15 +7,19 @@
 //   2. makes a short-lived signed URL for it (eve's `document1`),
 //   3. calls eve /v3/tasks/sync/validate/document with doc_type=ind_pan and
 //      all advanced_features on, and
-//   4. returns { ok, failed[] } — ok only when every advanced feature passed.
+//   4. if every advanced feature passed, OCRs the same image with
+//      /v3/tasks/sync/extract/ind_pan, and
+//   5. returns { ok, failed[], pan_details } — ok only when validation passed
+//      and the OCR read a PAN number and name.
 //
 // Secrets (set with `supabase secrets set`): IDFY_API_KEY, IDFY_ACCOUNT_ID.
 // SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY are provided by the runtime.
 // Deploy with --no-verify-jwt: the app's sb_publishable key is not a JWT.
 
-import { evaluateAdvancedFeatures } from './checks.mjs';
+import { evaluateAdvancedFeatures, pickPanDetails } from './checks.mjs';
 
 const EVE_URL = 'https://eve.idfy.com/v3/tasks/sync/validate/document';
+const EVE_OCR_URL = 'https://eve.idfy.com/v3/tasks/sync/extract/ind_pan';
 const BUCKET = 'pan-captures';
 const SIGNED_URL_TTL_S = 600;
 const MAX_IMAGE_BYTES = 6 * 1024 * 1024;
@@ -143,9 +147,10 @@ Deno.serve(async (req) => {
   try {
     const documentUrl = await storeAndSign(img.bytes, img.contentType, `${sessionId}/${taskId}.${ext}`);
 
+    const eveHeaders = { 'Content-Type': 'application/json', 'api-key': IDFY_API_KEY, 'account-id': IDFY_ACCOUNT_ID };
     const eve = await fetch(EVE_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'api-key': IDFY_API_KEY, 'account-id': IDFY_ACCOUNT_ID },
+      headers: eveHeaders,
       body: JSON.stringify({
         task_id: taskId,
         group_id: groupId,
@@ -158,28 +163,50 @@ Deno.serve(async (req) => {
     });
     const out = await eve.json().catch(() => ({}));
     const verdict = eve.ok && out.status === 'completed' ? evaluateAdvancedFeatures(out.result) : null;
+
+    // Validation passed -> OCR the same image, again with fresh eve ids.
+    let ocr: { task_id: string; group_id: string; http_status: number; response: any } | null = null;
+    if (verdict?.ok) {
+      const ocrTaskId = crypto.randomUUID();
+      const ocrGroupId = crypto.randomUUID();
+      const res = await fetch(EVE_OCR_URL, {
+        method: 'POST',
+        headers: eveHeaders,
+        body: JSON.stringify({ task_id: ocrTaskId, group_id: ocrGroupId, data: { document1: documentUrl } }),
+      });
+      ocr = { task_id: ocrTaskId, group_id: ocrGroupId, http_status: res.status, response: await res.json().catch(() => ({})) };
+    }
+    const details = ocr ? pickPanDetails(ocr.response) : null;
+
     await saveResponse(`${sessionId}/${taskId}.json`, {
       at: new Date().toISOString(),
       request: { task_id: taskId, group_id: groupId, doc_type: 'ind_pan' },
       http_status: eve.status,
       verdict,
       response: out,
+      ocr,
     });
+
+    const ids = { task_id: taskId, group_id: groupId, request_id: out.request_id, ocr_task_id: ocr?.task_id, ocr_group_id: ocr?.group_id };
 
     if (!verdict) {
       // e.g. 422 INVALID_IMAGE (too small / unreadable) — the customer retakes.
       console.warn('[validate-pan] eve error', eve.status, JSON.stringify(out));
+      return reply(200, { ok: false, failed: [], error: out.error ?? `EVE_${eve.status}`, message: out.message ?? null, ...ids });
+    }
+    if (!verdict.ok) return reply(200, { ...verdict, ...ids, result: out.result });
+    if (!details) {
+      console.warn('[validate-pan] ocr failed', ocr?.http_status, JSON.stringify(ocr?.response));
       return reply(200, {
         ok: false,
         failed: [],
-        error: out.error ?? `EVE_${eve.status}`,
-        message: out.message ?? null,
-        task_id: taskId,
-        group_id: groupId,
+        error: 'OCR_FAILED',
+        message: ocr?.response?.message ?? null,
+        ...ids,
+        result: out.result,
       });
     }
-
-    return reply(200, { ...verdict, task_id: taskId, group_id: groupId, request_id: out.request_id, result: out.result });
+    return reply(200, { ok: true, failed: [], ...ids, result: out.result, pan_details: details });
   } catch (err) {
     console.error('[validate-pan]', err);
     return reply(502, { ok: false, failed: [], error: 'UPSTREAM_FAILED' });
