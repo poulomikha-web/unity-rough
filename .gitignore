@@ -28,3 +28,6 @@ next-env.d.ts
 
 # generated from .env.local by scripts/gen-svc-config.mjs
 /public/svc-config.js
+
+# Supabase CLI local state
+/supabase/.temp/
