@@ -141,9 +141,11 @@ test('PAN found in NSDL with matching name and DOB passes', () => {
   assert.deepEqual(evaluateNsdl(NSDL), { ok: true, failed: [] });
 });
 
-test('NSDL failures are reported per check', () => {
-  assert.deepEqual(evaluateNsdl(nsdl({ status: 'id_not_found' })).failed, ['pan_not_found']);
-  assert.deepEqual(evaluateNsdl(nsdl({ name_match: false })).failed, ['name_match']);
-  assert.deepEqual(evaluateNsdl(nsdl({ dob_match: false, name_match: false })).failed, ['name_match', 'dob_match']);
-  assert.deepEqual(evaluateNsdl(undefined).failed, ['pan_not_found', 'name_match', 'dob_match']);
+test('only a PAN not found in NSDL blocks the customer', () => {
+  assert.deepEqual(evaluateNsdl(nsdl({ status: 'id_not_found' })), { ok: false, failed: ['pan_not_found'] });
+  assert.deepEqual(evaluateNsdl(undefined), { ok: false, failed: ['pan_not_found'] });
+});
+
+test('name or DOB mismatch does not block once the PAN is found', () => {
+  assert.equal(evaluateNsdl(nsdl({ name_match: false, dob_match: false })).ok, true);
 });

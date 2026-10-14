@@ -15,9 +15,7 @@ export type PanFeature =
   | 'is_live'
   | 'optimal_dimensions'
   // verify_with_source/ind_pan (NSDL)
-  | 'pan_not_found'
-  | 'name_match'
-  | 'dob_match';
+  | 'pan_not_found';
 
 /** PAN details read by eve OCR (extract/ind_pan). */
 export interface PanDetails {
@@ -50,8 +48,6 @@ export const PAN_FEATURE_MESSAGES: Record<PanFeature, string> = {
   is_live: 'Please capture the physical card, not a photo of it on a screen or paper.',
   optimal_dimensions: 'Hold the card closer so it fills the frame.',
   pan_not_found: 'This PAN was not found in the NSDL (Income Tax) records.',
-  name_match: 'The name on the card does not match the NSDL records.',
-  dob_match: 'The date of birth on the card does not match the NSDL records.',
 };
 
 /**

@@ -112,21 +112,17 @@ export function toIsoDob(raw) {
   return `${y}-${mo.padStart(2, '0')}-${d.padStart(2, '0')}`;
 }
 
-/** @typedef {'pan_not_found' | 'name_match' | 'dob_match'} NsdlCheck */
+/** @typedef {'pan_not_found'} NsdlCheck */
 
 /**
  * Decide the NSDL check from eve's verify_with_source/ind_pan `result`: the
- * PAN must exist (status id_found) and both name and DOB must match.
+ * customer proceeds only if the PAN exists (source_output.status id_found).
+ * name_match / dob_match are recorded but don't block. The caller only
+ * evaluates tasks whose status is "completed".
  *
  * @param {any} result
  * @returns {{ ok: boolean, failed: NsdlCheck[] }}
  */
 export function evaluateNsdl(result) {
-  const o = result?.source_output ?? {};
-  /** @type {NsdlCheck[]} */
-  const failed = [];
-  if (o.status !== 'id_found') failed.push('pan_not_found');
-  if (o.name_match !== true) failed.push('name_match');
-  if (o.dob_match !== true) failed.push('dob_match');
-  return { ok: failed.length === 0, failed };
+  return result?.source_output?.status === 'id_found' ? { ok: true, failed: [] } : { ok: false, failed: ['pan_not_found'] };
 }

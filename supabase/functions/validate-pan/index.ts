@@ -14,7 +14,8 @@
 //      /v3/tasks?request_id= for its result,
 //   6. if acceptable, verifies the OCR'd PAN number, name and DOB against
 //      NSDL with /v3/tasks/sync/verify_with_source/ind_pan, and
-//   7. returns { ok, failed[], pan_details } — ok only when all four passed.
+//   7. returns { ok, failed[], pan_details } — ok only when all four passed
+//      (for NSDL: task status "completed" and source_output.status "id_found").
 // Every eve call gets its own fresh task_id/group_id.
 //
 // Secrets (set with `supabase secrets set`): IDFY_API_KEY, IDFY_ACCOUNT_ID.
