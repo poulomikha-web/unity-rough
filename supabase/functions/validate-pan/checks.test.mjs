@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { evaluateAcceptability, evaluateAdvancedFeatures, pickPanDetails } from './checks.mjs';
+import { evaluateAcceptability, evaluateAdvancedFeatures, evaluateNsdl, pickPanDetails, toIsoDob } from './checks.mjs';
 
 // Real `result` returned by eve validate/document for a good PAN front.
 const GOOD = {
@@ -112,4 +112,38 @@ test('missing acceptability details fail every check, booleans also accepted', (
     'optimal_dimensions',
   ]);
   assert.equal(evaluateAcceptability({ details: { card_hindrance: false, flash_on_card: [false], is_photocopy: 'false', is_live: true, optimal_dimensions: ['true'] } }).ok, true);
+});
+
+test('OCR dates convert to yyyy-mm-dd for NSDL', () => {
+  assert.equal(toIsoDob('1985-06-08'), '1985-06-08');
+  assert.equal(toIsoDob('08/06/1985'), '1985-06-08');
+  assert.equal(toIsoDob('08-06-1985'), '1985-06-08');
+  assert.equal(toIsoDob(' 8/6/1985 '), '1985-06-08');
+  assert.equal(toIsoDob('1985/06/08'), '1985-06-08');
+  assert.equal(toIsoDob(''), null);
+  assert.equal(toIsoDob('31/02/1985'), null);
+  assert.equal(toIsoDob('June 1985'), null);
+});
+
+// Shape of eve's verify_with_source/ind_pan `result` (values made up).
+const NSDL = {
+  source_output: {
+    aadhaar_seeding_status: true,
+    dob_match: true,
+    name_match: true,
+    pan_status: 'Existing and Valid. PAN is Operative',
+    status: 'id_found',
+  },
+};
+const nsdl = (o) => ({ source_output: { ...NSDL.source_output, ...o } });
+
+test('PAN found in NSDL with matching name and DOB passes', () => {
+  assert.deepEqual(evaluateNsdl(NSDL), { ok: true, failed: [] });
+});
+
+test('NSDL failures are reported per check', () => {
+  assert.deepEqual(evaluateNsdl(nsdl({ status: 'id_not_found' })).failed, ['pan_not_found']);
+  assert.deepEqual(evaluateNsdl(nsdl({ name_match: false })).failed, ['name_match']);
+  assert.deepEqual(evaluateNsdl(nsdl({ dob_match: false, name_match: false })).failed, ['name_match', 'dob_match']);
+  assert.deepEqual(evaluateNsdl(undefined).failed, ['pan_not_found', 'name_match', 'dob_match']);
 });

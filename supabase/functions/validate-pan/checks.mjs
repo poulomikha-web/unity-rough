@@ -91,3 +91,42 @@ export function evaluateAcceptability(result) {
   }
   return { ok: failed.length === 0, failed };
 }
+
+/**
+ * Normalise an OCR date of birth to the yyyy-mm-dd NSDL expects. Accepts
+ * yyyy-mm-dd, yyyy/mm/dd, dd/mm/yyyy and dd-mm-yyyy; returns null for
+ * anything else or an impossible date.
+ *
+ * @param {unknown} raw
+ * @returns {string | null}
+ */
+export function toIsoDob(raw) {
+  const s = typeof raw === 'string' ? raw.trim() : '';
+  let m = /^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/.exec(s);
+  let y, mo, d;
+  if (m) [, y, mo, d] = m;
+  else if ((m = /^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/.exec(s))) [, d, mo, y] = m;
+  else return null;
+  const date = new Date(Date.UTC(+y, +mo - 1, +d));
+  if (date.getUTCFullYear() !== +y || date.getUTCMonth() !== +mo - 1 || date.getUTCDate() !== +d) return null;
+  return `${y}-${mo.padStart(2, '0')}-${d.padStart(2, '0')}`;
+}
+
+/** @typedef {'pan_not_found' | 'name_match' | 'dob_match'} NsdlCheck */
+
+/**
+ * Decide the NSDL check from eve's verify_with_source/ind_pan `result`: the
+ * PAN must exist (status id_found) and both name and DOB must match.
+ *
+ * @param {any} result
+ * @returns {{ ok: boolean, failed: NsdlCheck[] }}
+ */
+export function evaluateNsdl(result) {
+  const o = result?.source_output ?? {};
+  /** @type {NsdlCheck[]} */
+  const failed = [];
+  if (o.status !== 'id_found') failed.push('pan_not_found');
+  if (o.name_match !== true) failed.push('name_match');
+  if (o.dob_match !== true) failed.push('dob_match');
+  return { ok: failed.length === 0, failed };
+}

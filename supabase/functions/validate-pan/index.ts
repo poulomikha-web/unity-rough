@@ -11,20 +11,23 @@
 //      /v3/tasks/sync/extract/ind_pan,
 //   5. if the OCR read the card, runs the async
 //      /v3/tasks/async/check_acceptability/document (live_captured) and polls
-//      /v3/tasks?request_id= for its result, and
-//   6. returns { ok, failed[], pan_details } — ok only when all three passed.
+//      /v3/tasks?request_id= for its result,
+//   6. if acceptable, verifies the OCR'd PAN number, name and DOB against
+//      NSDL with /v3/tasks/sync/verify_with_source/ind_pan, and
+//   7. returns { ok, failed[], pan_details } — ok only when all four passed.
 // Every eve call gets its own fresh task_id/group_id.
 //
 // Secrets (set with `supabase secrets set`): IDFY_API_KEY, IDFY_ACCOUNT_ID.
 // SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY are provided by the runtime.
 // Deploy with --no-verify-jwt: the app's sb_publishable key is not a JWT.
 
-import { evaluateAcceptability, evaluateAdvancedFeatures, pickPanDetails } from './checks.mjs';
+import { evaluateAcceptability, evaluateAdvancedFeatures, evaluateNsdl, pickPanDetails, toIsoDob } from './checks.mjs';
 
 const EVE_URL = 'https://eve.idfy.com/v3/tasks/sync/validate/document';
 const EVE_OCR_URL = 'https://eve.idfy.com/v3/tasks/sync/extract/ind_pan';
 const EVE_ACCEPTABILITY_URL = 'https://eve.idfy.com/v3/tasks/async/check_acceptability/document';
 const EVE_TASKS_URL = 'https://eve.idfy.com/v3/tasks';
+const EVE_NSDL_URL = 'https://eve.idfy.com/v3/tasks/sync/verify_with_source/ind_pan';
 const ACCEPTABILITY_POLL_MS = 1000;
 const ACCEPTABILITY_TIMEOUT_MS = 25_000;
 const BUCKET = 'pan-captures';
@@ -227,6 +230,22 @@ Deno.serve(async (req) => {
     }
     const accVerdict = acceptability?.response?.status === 'completed' ? evaluateAcceptability(acceptability.response.result) : null;
 
+    // Acceptable -> confirm the PAN exists in NSDL with the OCR'd name and DOB.
+    const dob = details ? toIsoDob(details.date_of_birth) : null;
+    let nsdl: { task_id: string; group_id: string; http_status: number; request: unknown; response: any } | null = null;
+    if (accVerdict?.ok && details && dob) {
+      const nsdlTaskId = crypto.randomUUID();
+      const nsdlGroupId = crypto.randomUUID();
+      const data = { id_number: details.pan_number, full_name: details.name, dob };
+      const res = await fetch(EVE_NSDL_URL, {
+        method: 'POST',
+        headers: eveHeaders,
+        body: JSON.stringify({ task_id: nsdlTaskId, group_id: nsdlGroupId, data }),
+      });
+      nsdl = { task_id: nsdlTaskId, group_id: nsdlGroupId, http_status: res.status, request: data, response: await res.json().catch(() => ({})) };
+    }
+    const nsdlVerdict = nsdl?.response?.status === 'completed' ? evaluateNsdl(nsdl.response.result) : null;
+
     await saveResponse(`${sessionId}/${taskId}.json`, {
       at: new Date().toISOString(),
       request: { task_id: taskId, group_id: groupId, doc_type: 'ind_pan' },
@@ -235,6 +254,7 @@ Deno.serve(async (req) => {
       response: out,
       ocr,
       acceptability: acceptability && { ...acceptability, verdict: accVerdict },
+      nsdl: nsdl && { ...nsdl, verdict: nsdlVerdict },
     });
 
     const ids = {
@@ -245,6 +265,8 @@ Deno.serve(async (req) => {
       ocr_group_id: ocr?.group_id,
       acceptability_task_id: acceptability?.task_id,
       acceptability_group_id: acceptability?.group_id,
+      nsdl_task_id: nsdl?.task_id,
+      nsdl_group_id: nsdl?.group_id,
     };
 
     if (!verdict) {
@@ -277,7 +299,22 @@ Deno.serve(async (req) => {
       });
     }
     if (!accVerdict.ok) return reply(200, { ...accVerdict, ...ids, acceptability: acceptability?.response?.result });
-    return reply(200, { ok: true, failed: [], ...ids, result: out.result, pan_details: details });
+    if (!dob) {
+      // OCR gave no usable date of birth, so NSDL can't be asked.
+      return reply(200, { ok: false, failed: [], error: 'DOB_UNREADABLE', message: null, ...ids });
+    }
+    if (!nsdlVerdict) {
+      console.warn('[validate-pan] nsdl error', JSON.stringify(nsdl));
+      return reply(200, {
+        ok: false,
+        failed: [],
+        error: nsdl?.response?.error ?? 'NSDL_FAILED',
+        message: nsdl?.response?.message ?? null,
+        ...ids,
+      });
+    }
+    if (!nsdlVerdict.ok) return reply(200, { ...nsdlVerdict, ...ids });
+    return reply(200, { ok: true, failed: [], ...ids, result: out.result, pan_details: details, pan_status: nsdl?.response?.result?.source_output?.pan_status ?? null });
   } catch (err) {
     console.error('[validate-pan]', err);
     return reply(502, { ok: false, failed: [], error: 'UPSTREAM_FAILED' });

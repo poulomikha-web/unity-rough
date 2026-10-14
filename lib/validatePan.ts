@@ -13,7 +13,11 @@ export type PanFeature =
   | 'flash_on_card'
   | 'is_photocopy'
   | 'is_live'
-  | 'optimal_dimensions';
+  | 'optimal_dimensions'
+  // verify_with_source/ind_pan (NSDL)
+  | 'pan_not_found'
+  | 'name_match'
+  | 'dob_match';
 
 /** PAN details read by eve OCR (extract/ind_pan). */
 export interface PanDetails {
@@ -45,12 +49,17 @@ export const PAN_FEATURE_MESSAGES: Record<PanFeature, string> = {
   is_photocopy: 'Please capture the original PAN card, not a photocopy.',
   is_live: 'Please capture the physical card, not a photo of it on a screen or paper.',
   optimal_dimensions: 'Hold the card closer so it fills the frame.',
+  pan_not_found: 'This PAN was not found in the NSDL (Income Tax) records.',
+  name_match: 'The name on the card does not match the NSDL records.',
+  dob_match: 'The date of birth on the card does not match the NSDL records.',
 };
 
 /**
  * Validate the captured PAN front via the `validate-pan` edge function, which
  * stores the image, passes its signed URL to IDfy eve as `document1`
- * (doc_type ind_pan) and checks every advanced_features result.
+ * (doc_type ind_pan) and checks every advanced_features result; then OCRs the
+ * card (extract/ind_pan), checks it is acceptable (check_acceptability) and
+ * verifies the PAN, name and DOB with NSDL (verify_with_source/ind_pan).
  *
  * Never throws: transport failures come back as `{ ok: false, error }`.
  */

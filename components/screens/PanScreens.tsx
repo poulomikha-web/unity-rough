@@ -124,7 +124,7 @@ function PanField({ label, value }: { label: string; value: string }) {
 type VerifyPhase = 'uploading' | 'verifying' | 'verified' | 'failed';
 
 /** Errors that a plain retry may fix, as opposed to needing a new capture. */
-const TRANSIENT_ERRORS = new Set(['NETWORK', 'UPSTREAM_FAILED', 'NOT_CONFIGURED', 'ACCEPTABILITY_TIMEOUT']);
+const TRANSIENT_ERRORS = new Set(['NETWORK', 'UPSTREAM_FAILED', 'NOT_CONFIGURED', 'ACCEPTABILITY_TIMEOUT', 'NSDL_FAILED']);
 
 /**
  * PAN — verify: Uploading -> Verifying Document -> Document Verified -> Continue.
