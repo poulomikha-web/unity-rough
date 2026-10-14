@@ -14,12 +14,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { joinCallChannel, type BroadcastChannel, type SignalMessage } from './realtime';
+import { ICE_SERVERS } from './iceServers';
 
 const RING_EVERY_MS = 3000; // re-announce while queued (agents expire stale rings)
 const ACK_WINDOW_MS = 2500; // how long to wait for agents to answer the first ring
-const ICE_SERVERS: RTCIceServer[] = [
-  { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] },
-];
 
 export type CallStatus = 'idle' | 'ringing' | 'accepted' | 'connected' | 'ended';
 /** live = a real agent is on the other end; demo = the simulated prototype call. */
@@ -155,17 +153,26 @@ export function useAgentCall(handlers: CallHandlers) {
       // New MediaStream identity so <video> elements re-attach.
       setRemoteStream(new MediaStream(remote.getTracks()));
     };
+    // Diagnostics: call-state milestones on the channel (agents ignore them).
+    const diag = (event: string, data: Record<string, unknown> = {}) =>
+      post('diag', { side: 'customer', event, ...data });
     pc.onicecandidate = (e) => {
-      if (e.candidate) post('ice', e.candidate.toJSON(), agentRef.current ?? undefined);
+      if (!e.candidate) return;
+      post('ice', e.candidate.toJSON(), agentRef.current ?? undefined);
+      diag('cand', { type: e.candidate.type, proto: e.candidate.protocol });
     };
+    pc.oniceconnectionstatechange = () => diag('ice', { state: pc.iceConnectionState });
     pc.onconnectionstatechange = () => {
+      diag('conn', { state: pc.connectionState });
       if (pc.connectionState === 'connected' && statusRef.current !== 'connected') {
         setStat('connected');
         startStats();
         handlersRef.current.onConnected?.();
       }
-      // Agent tab closed / network gone for good — there is no server to tell us.
-      if (pc.connectionState === 'failed' && pcRef.current === pc) {
+      // Agent tab closed / network gone after we were connected — there is no
+      // server to tell us. (Failing before ever connecting = network blocked
+      // the media path; keep the call up so the agent can still talk / retry.)
+      if (pc.connectionState === 'failed' && pcRef.current === pc && statusRef.current === 'connected') {
         teardown();
         setStat('ended');
         handlersRef.current.onHangup?.();
@@ -249,7 +256,8 @@ export function useAgentCall(handlers: CallHandlers) {
 
   /**
    * Join the agent queue. Resolves with the number of agents that answered
-   * the first ring (0 → caller should fall back to the simulated demo call).
+   * the first ring (0 → none online yet, keep waiting), or -1 when the call
+   * server is unreachable (→ caller falls back to the simulated demo call).
    */
   const ring = useCallback(
     async (camera: MediaStream | null, meta: RingMeta): Promise<number> => {
@@ -268,9 +276,9 @@ export function useAgentCall(handlers: CallHandlers) {
       // A newer ring()/teardown() replaced us while we were connecting.
       if (idRef.current !== id) {
         chan?.close();
-        return 0;
+        return -1;
       }
-      if (!chan) return 0;
+      if (!chan) return -1;
       chanRef.current = chan;
       setStat('ringing');
 
@@ -286,7 +294,7 @@ export function useAgentCall(handlers: CallHandlers) {
       ringTimer.current = setInterval(announce, RING_EVERY_MS);
 
       await new Promise((r) => setTimeout(r, ACK_WINDOW_MS));
-      return idRef.current === id ? acksRef.current.size : 0;
+      return idRef.current === id ? acksRef.current.size : -1;
     },
     [onMessage, post, setStat, teardown]
   );

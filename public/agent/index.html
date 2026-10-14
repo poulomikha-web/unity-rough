@@ -956,7 +956,7 @@ code{font-family:ui-monospace,Menlo,monospace;background:#fff;padding:1px 6px;bo
           <video id="custVideo" autoplay muted playsinline></video>
           <div class="ph">
             <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><circle cx="12" cy="8.5" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
-            <p>Customer camera</p>
+            <p id="custPh">Customer camera</p>
           </div>
         </div>
 
@@ -1480,11 +1480,15 @@ const tally  = {verified:0, rejected:0, unable:0};
 const STAGE_COPY = {
   offline: ['Offline', 'Use the toggle on the side to toggle status to Online.'],
   online:  ['Online',  'You are ready to receive calls.'],
+  linking: ['Online',  'Connecting to the call server…'],
+  nolink:  ['Online',  'Can\u2019t reach the call server (Supabase Realtime) — retrying. Check your network / VPN.'],
   ringing: ['Online',  'A customer is waiting — accept the call to start the session.'],
   session: ['Online',  'Session in progress.']
 };
 
 function setStage(mode){
+  // "Online" only means ready once the call server link is up.
+  if (mode === 'online' && RTC.enabled && !RTC.connected) mode = RTC.failed ? 'nolink' : 'linking';
   el('stage').classList.toggle('online', mode !== 'offline');
   el('banner').hidden = mode !== 'ringing';
   const [state, sub] = STAGE_COPY[mode] || STAGE_COPY.offline;
@@ -1500,12 +1504,9 @@ function paintRecv(){
 
 function queueNextCall(){
   clearTimeout(incoming);
-  if (RTC.connected) return RTC.next();          // real customers ring from the hub
-  // No signaling hub (e.g. opened from file://) — keep the simulated queue.
-  incoming = setTimeout(() => {
-    if (!online || countdown) return;
-    RTC.connected ? RTC.next() : openCall();
-  }, RING_DELAY);
+  if (RTC.enabled) return RTC.next();            // only real customers ring
+  // No call server configured (e.g. opened from file://) — simulated queue demo.
+  incoming = setTimeout(() => { if (online && !countdown) openCall(); }, RING_DELAY);
 }
 
 function openCall(){
@@ -2744,12 +2745,27 @@ document.addEventListener('keydown', e => {
 const RTC = (() => {
   const CFG   = window.SVC_CONFIG || {};
   const TOPIC = 'realtime:unity-svc-call';
-  const ICE   = [{urls:['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302']}];
+  // TURN (from svc-config.js) is needed when either side is behind carrier-grade NAT.
+  const ICE   = [{urls:['stun:stun.l.google.com:19302', 'stun:stun.cloudflare.com:3478']}]
+    .concat(CFG.turnUrls?.length ? [{urls:CFG.turnUrls, username:CFG.turnUsername, credential:CFG.turnCredential}] : []);
   const STALE_MS = 9000;       // a ring not repeated for this long = customer gone
   const id   = 'agent-' + (crypto.randomUUID?.() || Date.now().toString(36) + Math.random().toString(36).slice(2));
 
-  let ws = null, ref = 0, joinRef = '', beat = null, sweep = null, connected = false, wanted = false;
-  let pc = null, mic = null, remote = null, pendingIce = [], lastStats = null;
+  let ws = null, ref = 0, joinRef = '', beat = null, sweep = null, connected = false, wanted = false, failed = false;
+  const enabled = !!(CFG.supabaseUrl && CFG.supabaseKey);
+  const paintLink = () => { if (online && !countdown && el('session').hidden) setStage('online'); };
+  let pc = null, mic = null, remote = null, pendingIce = [], lastStats = null, everConnected = false;
+
+  // Placeholder text in the customer tile while the media link comes up.
+  function mediaNote(state){
+    const msg = {
+      connecting: 'Connecting video to the customer…',
+      blocked: CFG.turnUrls?.length
+        ? 'Video could not connect, even via the TURN relay. Check the TURN credentials.'
+        : 'Video blocked by the network (mobile data / carrier NAT). A TURN relay is needed \u2014 see README.',
+    }[state];
+    el('custPh').textContent = msg || 'Customer camera';
+  }
   const queue   = [];          // customers waiting, oldest first: {from, meta, seen}
   const skipped = new Set();   // declined by this agent — left for other agents
   let ringing = null;          // entry on the incoming-call overlay
@@ -2777,15 +2793,16 @@ const RTC = (() => {
       let m; try { m = JSON.parse(e.data); } catch { return; }
       if (m.topic !== TOPIC) return;
       if (m.event === 'phx_reply' && m.ref === joinRef && m.payload?.status === 'ok'){
-        connected = true;
-        clearTimeout(incoming);      // the simulated ring is no longer needed
+        connected = true; failed = false;
+        paintLink();
+        next();
       } else if (m.event === 'broadcast' && m.payload?.event === 'signal'){
         onMessage(m.payload.payload);
       }
     };
     ws.onclose = () => {
       clearInterval(beat); ws = null; connected = false;
-      if (wanted) setTimeout(connect, 1500);
+      if (wanted){ failed = true; paintLink(); setTimeout(connect, 1500); }
     };
     clearInterval(sweep);
     sweep = setInterval(() => {
@@ -2802,7 +2819,7 @@ const RTC = (() => {
 
   // Ring the oldest waiting customer if the agent is free.
   function next(){
-    if (!online || countdown || current || !el('session').hidden) return;
+    if (!online || countdown || claim || current || !el('session').hidden) return;
     const entry = queue.find(q => !skipped.has(q.from));
     if (!entry) return;
     ringing = entry;
@@ -2839,7 +2856,7 @@ const RTC = (() => {
         if (current && m.data?.src) loadJourneyDoc(m.data.kind, m.data.src, clock12(new Date(current.meta.ringingAt || Date.now())));
         break;
       case 'offer':
-        if (current && m.from === current.from) await answer(m.data);
+        if (current && m.from === current.from){ diag('offer-received', {}); await answer(m.data); }
         break;
       case 'ice':
         if (!pc || !pc.remoteDescription) pendingIce.push(m.data);
@@ -2889,33 +2906,58 @@ const RTC = (() => {
         v.play().catch(() => {});
         el('custFeed').classList.add('live');
       };
-      pc.onicecandidate = e => { if (e.candidate) post('ice', e.candidate.toJSON(), current?.from); };
+      pc.oniceconnectionstatechange = () => diag('ice', {state: pc?.iceConnectionState});
+      pc.onicecandidate = e => {
+        if (e.candidate){ post('ice', e.candidate.toJSON(), current?.from); diag('cand', {type: e.candidate.type, proto: e.candidate.protocol}); }
+      };
       pc.onconnectionstatechange = () => {
         const s = pc?.connectionState;
+        diag('conn', {state: s});
         el('custFeed').classList.toggle('off', s === 'disconnected' || s === 'failed');
-        if (s === 'failed' && current) customerLeft();   // their tab closed / network gone
+        mediaNote(s);
+        if (s === 'failed' && current){
+          // Never connected = the network blocked the media path, not a hang-up.
+          if (!everConnected) return mediaNote('blocked');
+          customerLeft();                // their tab closed / network gone
+        }
+        if (s === 'connected') everConnected = true;
       };
     }
     await pc.setRemoteDescription(offer);
 
-    await previewReady;
-    if (!mic){
-      try {
-        mic = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true, noiseSuppression:true}});
-        setMic(el('micBtn').getAttribute('aria-pressed') === 'true');
-      } catch { mic = null; }
-    }
+    // Answer straight away with whatever media we already have. Waiting for the
+    // agent's camera/mic would stall the call behind Chrome's permission prompt;
+    // the tracks are slotted in with replaceTrack as soon as they're ready.
     const a = tx('audio'), v = tx('video');
     if (a){ a.direction = 'sendrecv'; await a.sender.replaceTrack(mic?.getAudioTracks()[0] || null); }
     if (v){ v.direction = 'sendrecv'; await v.sender.replaceTrack(stream?.getVideoTracks()[0] || null); }
 
     await pc.setLocalDescription(await pc.createAnswer());
     post('answer', pc.localDescription.toJSON(), current?.from);
+    diag('answer-sent', {hasCam: !!stream, hasMic: !!mic});
     for (const c of pendingIce.splice(0)) await pc.addIceCandidate(c).catch(() => {});
+
+    attachLocalWhenReady();
   }
 
+  async function attachLocalWhenReady(){
+    await previewReady;
+    useCamera(stream);
+    if (!mic){
+      try {
+        mic = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true, noiseSuppression:true}});
+        setMic(el('micBtn').getAttribute('aria-pressed') === 'true');
+      } catch (e) { mic = null; diag('mic-failed', {err: e.name}); }
+    }
+    tx('audio')?.sender.replaceTrack(mic?.getAudioTracks()[0] || null).catch(() => {});
+    diag('local-media', {hasCam: !!stream, hasMic: !!mic});
+  }
+
+  // Diagnostics: broadcast call-state milestones (other peers ignore them).
+  function diag(event, data){ if (current) post('diag', {side:'agent', event, ...data}); }
+
   function teardown(){
-    pc?.close(); pc = null;
+    pc?.close(); pc = null; everConnected = false; mediaNote(null);
     mic?.getTracks().forEach(t => t.stop()); mic = null;
     remote = null; pendingIce = []; lastStats = null;
     const v = el('custVideo');
@@ -2961,6 +3003,8 @@ const RTC = (() => {
   return {
     connect, disconnect, next, accept, decline, hangup, setMic, useCamera, send, restart, paintStats,
     get connected(){ return connected; },
+    get enabled(){ return enabled; },
+    get failed(){ return failed; },
     get ringing(){ return !!ringing; },
     get live(){ return !!current; },
     get state(){ return pc?.connectionState || 'idle'; },

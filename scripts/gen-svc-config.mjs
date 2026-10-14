@@ -16,6 +16,11 @@ try {
 const cfg = {
   supabaseUrl: env.NEXT_PUBLIC_SUPABASE_URL || '',
   supabaseKey: env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
+  turnUrls: (env.NEXT_PUBLIC_TURN_URLS || '').split(',').map((u) => u.trim()).filter(Boolean),
+  turnUsername: env.NEXT_PUBLIC_TURN_USERNAME || '',
+  turnCredential: env.NEXT_PUBLIC_TURN_CREDENTIAL || '',
 };
 writeFileSync('public/svc-config.js', `window.SVC_CONFIG = ${JSON.stringify(cfg)};\n`);
-console.log(`svc-config.js written (supabase ${cfg.supabaseUrl ? 'configured' : 'NOT configured'})`);
+console.log(
+  `svc-config.js written (supabase ${cfg.supabaseUrl ? 'configured' : 'NOT configured'}, turn ${cfg.turnUrls.length ? 'configured' : 'not configured'})`
+);

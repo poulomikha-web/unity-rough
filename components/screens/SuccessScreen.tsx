@@ -8,14 +8,14 @@ import { CamVideo, SecuredFooter } from '@/components/shared';
 /**
  * Waiting-for-agent screen with an estimated-wait countdown + hold music.
  *
- * On entry the customer joins the live agent queue. If an agent console is
- * online we stay here until an agent accepts (the accept moves us to
- * "connecting"); otherwise the countdown runs out into the simulated call.
+ * On entry the customer joins the live agent queue and stays here until an
+ * agent accepts (the accept moves us to "connecting"). Only when the call
+ * server is unreachable does the countdown run out into the simulated call.
  */
 export function SuccessScreen() {
   const { go, restart, holdMusic, ringAgent, call } = useJourney();
   const [secs, setSecs] = useState<number>(TIMING.waitCountdownFrom);
-  // null = still asking the signaling server; 0 = nobody online (demo call).
+  // null = still joining; -1 = call server unreachable (demo call); n >= 0 = live queue.
   const agentsRef = useRef<number | null>(null);
   const [liveQueue, setLiveQueue] = useState(false);
 
@@ -28,14 +28,14 @@ export function SuccessScreen() {
     void ringAgent().then((n) => {
       if (cancelled) return;
       agentsRef.current = n;
-      setLiveQueue(n > 0);
+      setLiveQueue(n >= 0);
     });
 
     const tick = setInterval(() => {
       s -= 1;
       setSecs(Math.max(s, 0));
       // Live queue: keep holding until an agent accepts. Demo: carry on.
-      if (s <= 0 && agentsRef.current === 0) {
+      if (s <= 0 && agentsRef.current === -1) {
         clearInterval(tick);
         call.cancel();
         go('connecting');

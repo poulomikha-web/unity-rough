@@ -45,7 +45,7 @@ interface JourneyValue {
   holdMusic: ReturnType<typeof useHoldMusic>;
   /** Live WebRTC call with the agent console (falls back to the demo call). */
   call: AgentCall;
-  /** Join the agent queue from the waiting screen; resolves with agents online. */
+  /** Join the agent queue from the waiting screen; resolves with agents online (-1 = no call server). */
   ringAgent: () => Promise<number>;
 
   // Onboarding (permissions) sequence
