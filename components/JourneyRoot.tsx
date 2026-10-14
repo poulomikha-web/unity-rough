@@ -17,7 +17,6 @@ import {
   ObSuccessScreen,
   PermPopup,
 } from '@/components/screens/OnboardScreens';
-import { PrepareScreen } from '@/components/screens/PrepareScreen';
 import { CaptureScreen } from '@/components/screens/CaptureScreen';
 import { PanFrontScreen, PanCapturedScreen, PanVerifyScreen } from '@/components/screens/PanScreens';
 import { CompareScreen } from '@/components/screens/CompareScreen';
@@ -35,7 +34,6 @@ const SCREENS: Record<Screen, ComponentType> = {
   obSuccess: ObSuccessScreen,
   obInternet: ObInternetScreen,
   obStrong: ObStrongScreen,
-  prepare: PrepareScreen,
   capture: CaptureScreen,
   panFront: PanFrontScreen,
   panCaptured: PanCapturedScreen,

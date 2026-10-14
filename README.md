@@ -30,7 +30,6 @@ Redirect (secure-page loader, ~5s)
   → KYC Welcome  ── "Accept & Proceed"
   → Onboarding:  Permissions intro → Location → Camera → Microphone   (simulated Allow/Deny popups)
                  → All Set → Checking Internet → Strong Connection
-  → Prepare (face oval, simulated detection → Start)
   → Capture Selfie (full-screen camera modal: detect → shutter → preview → Done)
   → PAN Front capture → "Captured!" → Verify (Uploading → Verifying → Verified)
   → Face Compare ("Verification in progress")
@@ -49,7 +48,7 @@ app/
 components/
   JourneyRoot.tsx     Phone frame + active-screen switch + permission popup
   shared.tsx          IDfy logo defs, "Secured by" footer, Uni header, <CamVideo>
-  screens/            One component per screen (Redirect, KycWelcome, Onboard*, Prepare,
+  screens/            One component per screen (Redirect, KycWelcome, Onboard*,
                       Capture (+selfie modal), Pan*, Compare, Success, Connecting, Call screens)
 lib/
   journey.ts          Screen ids, onboarding sequence, permission copy, timing constants

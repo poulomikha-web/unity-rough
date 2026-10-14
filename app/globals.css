@@ -1154,10 +1154,11 @@
   .capture-video-wrap {
     position: relative;
     width: 100%;
-    aspect-ratio: 16 / 10;
+    /* Fill everything above the capture card — no empty black band. */
+    flex: 1 1 auto;
+    min-height: 0;
     background: #1a1a1a;
     overflow: hidden;
-    flex-shrink: 0;
   }
   .capture-video-wrap video {
     position: absolute; inset: 0;
@@ -1191,7 +1192,7 @@
     z-index: 3;
   }
   .capture-bottom {
-    flex: 1;
+    flex: 0 0 auto;
     display: flex;
     flex-direction: column;
     justify-content: flex-end;

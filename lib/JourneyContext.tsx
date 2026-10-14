@@ -226,7 +226,7 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
         accuracy: permResultsRef.current.accuracy,
         user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : null,
       });
-      setScreen('prepare');
+      setScreen('capture');
       return;
     }
 

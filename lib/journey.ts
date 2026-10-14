@@ -14,7 +14,6 @@ export type Screen =
   | 'obSuccess'
   | 'obInternet'
   | 'obStrong'
-  | 'prepare'
   | 'capture'
   | 'panFront'
   | 'panCaptured'
@@ -64,7 +63,6 @@ export const PERM_INFO: Record<PermKind, { what: string; icon: string }> = {
 // ---- Timing constants (ms) ----
 export const TIMING = {
   redirect: 5000, // secure-page loader before KYC welcome
-  prepareFaceDetect: 2600, // "face not visible" -> enable Start
   panCapturedHold: 1700, // "Captured!" -> verify screen
   panUploading: 1700, // "Uploading..." -> "Verifying Document..."
   panVerified: 3600, // verify enter -> "Document Verified" + Continue
