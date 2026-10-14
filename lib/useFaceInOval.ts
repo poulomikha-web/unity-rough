@@ -94,21 +94,23 @@ export function classify(
     ((p.x - cx) / rx) ** 2 + ((p.y - cy) / ry) ** 2 <= slack;
 
   const b = faces[0].boundingBox!;
-  const corners = [
-    toEl(b.originX, b.originY),
-    toEl(b.originX + b.width, b.originY),
-    toEl(b.originX, b.originY + b.height),
-    toEl(b.originX + b.width, b.originY + b.height),
+  // A face is round, so test the box's edge midpoints (forehead, chin, both
+  // cheeks) — not its corners, which stick out past the oval's curve even when
+  // the whole face is inside.
+  const edges = [
+    toEl(b.originX + b.width / 2, b.originY),
+    toEl(b.originX + b.width / 2, b.originY + b.height),
+    toEl(b.originX, b.originY + b.height / 2),
+    toEl(b.originX + b.width, b.originY + b.height / 2),
   ];
   const faceW = b.width * scale;
 
-  // BlazeFace's box spans brows→mouth, so the real head is a bit larger:
-  // demand a sensible size, every keypoint (eyes, nose, mouth, ears) inside,
-  // and the box corners inside the oval (small slack for the rounded box).
+  // Sensible size, plus every keypoint (eyes, nose, mouth, ears) and edge
+  // midpoint inside the oval.
   if (faceW < rx * 2 * 0.38) return 'far';
-  if (faceW > rx * 2 * 0.9) return 'close';
+  if (faceW > rx * 2 * 0.95) return 'close';
   const keypoints = faces[0].keypoints.map((k) => toEl(k.x * vw, k.y * vh));
-  if (!keypoints.every((p) => inOval(p)) || !corners.every((p) => inOval(p, 1.08))) return 'outside';
+  if (!keypoints.every((p) => inOval(p)) || !edges.every((p) => inOval(p))) return 'outside';
   return 'ok';
 }
 

@@ -16,6 +16,7 @@ import {
   ObMicScreen,
   ObSuccessScreen,
   PermPopup,
+  PermBlockedSheet,
 } from '@/components/screens/OnboardScreens';
 import { CaptureScreen } from '@/components/screens/CaptureScreen';
 import { PanFrontScreen, PanCapturedScreen, PanVerifyScreen } from '@/components/screens/PanScreens';
@@ -55,6 +56,7 @@ export function JourneyRoot() {
       <div className="phone-frame">
         <Active />
         <PermPopup />
+        <PermBlockedSheet />
       </div>
     </>
   );

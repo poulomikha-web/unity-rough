@@ -1,6 +1,8 @@
 'use client';
 
+import { useState } from 'react';
 import { useJourney } from '@/lib/JourneyContext';
+import type { PermKind } from '@/lib/journey';
 import { SecuredFooter, UniHeader } from '@/components/shared';
 import { asset } from '@/lib/asset';
 
@@ -252,6 +254,172 @@ export function PermPopup() {
         <button className="pp-btn pp-allow" onClick={() => permRespond(true)}>
           Allow
         </button>
+      </div>
+    </div>
+  );
+}
+
+const PERM_NAME: Record<PermKind, string> = {
+  camera: 'Camera',
+  microphone: 'Microphone',
+  location: 'Location',
+};
+
+type Platform = 'ios' | 'android' | 'desktop';
+function detectPlatform(): Platform {
+  if (typeof navigator === 'undefined') return 'desktop';
+  const ua = navigator.userAgent;
+  if (/iPhone|iPad|iPod/i.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)) return 'ios';
+  if (/Android/i.test(ua)) return 'android';
+  return 'desktop';
+}
+
+/** Where to flip a blocked site permission back on, per platform. */
+function settingsSteps(name: string, platform: Platform): string[] {
+  if (platform === 'ios')
+    return [
+      'Tap "aA" (or the page icon) in the address bar',
+      `Choose Website Settings → ${name} → Allow`,
+      'Come back here and tap Try again',
+    ];
+  if (platform === 'android')
+    return [
+      'Tap the icon on the left of the address bar',
+      `Open Permissions and turn ${name} on`,
+      'Come back here and tap Try again',
+    ];
+  return [
+    'Click the icon on the left of the address bar',
+    `Set ${name} to Allow`,
+    'Reload the page if asked, then try again',
+  ];
+}
+
+/** Title, explanation and fix-it steps for one failed permission. */
+function blockedCopy(kind: PermKind, reason: string, platform: Platform) {
+  const name = PERM_NAME[kind];
+  const lower = name.toLowerCase();
+  switch (reason) {
+    case 'denied-in-app':
+      return {
+        title: `${name} access is required`,
+        body: `Your Video KYC can't continue without your ${lower}. Tap Allow, then accept the browser's prompt.`,
+        steps: [] as string[],
+        cta: `Allow ${lower}`,
+      };
+    case 'NotAllowedError':
+    case 'SecurityError':
+    case 'PERMISSION_DENIED':
+      return {
+        title: `${name} access is blocked`,
+        body: `Your browser is blocking ${lower} access for this site, so it won't ask again. Turn it back on:`,
+        steps:
+          kind === 'location' && platform !== 'desktop'
+            ? [...settingsSteps(name, platform).slice(0, 2), 'Also check Location is on in your phone settings', 'Come back here and tap Try again']
+            : settingsSteps(name, platform),
+        cta: 'Try again',
+      };
+    case 'NotReadableError':
+    case 'AbortError':
+    case 'TrackStartError':
+      return {
+        title: `${name} is busy`,
+        body: `Another app is using your ${lower}. Close video-call or camera apps (and other tabs using the ${lower}), then try again.`,
+        steps: [],
+        cta: 'Try again',
+      };
+    case 'NotFoundError':
+    case 'OverconstrainedError':
+      return {
+        title: `No ${lower} found`,
+        body: `We couldn't find a ${lower} on this device. Connect one or switch to a phone, then try again.`,
+        steps: [],
+        cta: 'Try again',
+      };
+    case 'POSITION_UNAVAILABLE':
+    case 'TIMEOUT':
+      return {
+        title: "Couldn't get your location",
+        body: 'Turn on Location (GPS) in your phone settings, move near a window if indoors, then try again.',
+        steps: [],
+        cta: 'Try again',
+      };
+    case 'unsupported':
+      return {
+        title: 'Open in your browser',
+        body: `This in-app browser can't use your ${lower}. Open this link in ${
+          platform === 'ios' ? 'Safari' : 'Chrome'
+        } to continue.`,
+        steps: ['Tap ⋯ / ⋮ in the top corner', `Choose "Open in ${platform === 'ios' ? 'Safari' : 'Chrome'}" (or "Open in browser")`],
+        cta: 'Try again',
+      };
+    default:
+      return {
+        title: `Couldn't access your ${lower}`,
+        body: `Something went wrong (${reason}). Please try again.`,
+        steps: [],
+        cta: 'Try again',
+      };
+  }
+}
+
+/**
+ * Shown when a permission step fails. The journey stays on that step until
+ * access is granted — camera, microphone and location are all required.
+ */
+export function PermBlockedSheet() {
+  const { permBlocked, permRetry, permInfo } = useJourney();
+  const [busy, setBusy] = useState(false);
+  const [copied, setCopied] = useState(false);
+  if (!permBlocked) return null;
+
+  const platform = detectPlatform();
+  const copy = blockedCopy(permBlocked.kind, permBlocked.reason, platform);
+  const retry = async () => {
+    setBusy(true);
+    try {
+      await permRetry();
+    } finally {
+      setBusy(false);
+    }
+  };
+  const copyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* clipboard unavailable */
+    }
+  };
+
+  return (
+    <div className="perm-blocked" role="alertdialog" aria-labelledby="pbTitle">
+      <div className="pb-card">
+        <div className="pb-icon">
+          <svg viewBox="0 0 24 24">
+            <path d={permInfo[permBlocked.kind].icon} />
+          </svg>
+        </div>
+        <div className="pb-title" id="pbTitle">
+          {copy.title}
+        </div>
+        <p className="pb-body">{copy.body}</p>
+        {copy.steps.length > 0 && (
+          <ol className="pb-steps">
+            {copy.steps.map((s) => (
+              <li key={s}>{s}</li>
+            ))}
+          </ol>
+        )}
+        <button className="pb-cta" onClick={retry} disabled={busy}>
+          {busy ? 'Checking…' : copy.cta}
+        </button>
+        {permBlocked.reason === 'unsupported' && (
+          <button className="pb-secondary" onClick={copyLink}>
+            {copied ? 'Link copied' : 'Copy link'}
+          </button>
+        )}
       </div>
     </div>
   );

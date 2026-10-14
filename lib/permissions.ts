@@ -2,7 +2,19 @@
 
 import type { PermKind } from './journey';
 
+/**
+ * Why a permission request failed: a DOMException name from getUserMedia
+ * (NotAllowedError, NotReadableError, NotFoundError, …), a geolocation code
+ * (PERMISSION_DENIED, POSITION_UNAVAILABLE, TIMEOUT), or 'unsupported' when the
+ * browser has no API for it (typically an in-app browser / WebView).
+ */
+export type PermError = string;
+
+/** No camera/mic API: insecure page or an in-app browser that hides it. */
+const noMediaApi = () => typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia;
+
 export interface LocationResult {
+  error?: PermError;
   granted: boolean;
   latitude: number | null;
   longitude: number | null;
@@ -13,15 +25,16 @@ export interface LocationResult {
  * Request the real device camera. On success the live MediaStream is returned
  * so it can be shared across the journey's <video> elements.
  */
-export async function requestCamera(): Promise<{ granted: boolean; stream: MediaStream | null }> {
+export async function requestCamera(): Promise<{ granted: boolean; stream: MediaStream | null; error?: PermError }> {
+  if (noMediaApi()) return { granted: false, stream: null, error: 'unsupported' };
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
       video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
       audio: false,
     });
     return { granted: true, stream };
-  } catch {
-    return { granted: false, stream: null };
+  } catch (e) {
+    return { granted: false, stream: null, error: (e as Error)?.name || 'Error' };
   }
 }
 
@@ -29,13 +42,14 @@ export async function requestCamera(): Promise<{ granted: boolean; stream: Media
  * Request the real device microphone. We only need the permission grant here,
  * not the audio itself, so the tracks are stopped immediately.
  */
-export async function requestMicrophone(): Promise<{ granted: boolean }> {
+export async function requestMicrophone(): Promise<{ granted: boolean; error?: PermError }> {
+  if (noMediaApi()) return { granted: false, error: 'unsupported' };
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
     stream.getTracks().forEach((t) => t.stop());
     return { granted: true };
-  } catch {
-    return { granted: false };
+  } catch (e) {
+    return { granted: false, error: (e as Error)?.name || 'Error' };
   }
 }
 
@@ -43,7 +57,7 @@ export async function requestMicrophone(): Promise<{ granted: boolean }> {
 export function requestLocation(): Promise<LocationResult> {
   return new Promise((resolve) => {
     if (typeof navigator === 'undefined' || !navigator.geolocation) {
-      resolve({ granted: false, latitude: null, longitude: null, accuracy: null });
+      resolve({ granted: false, latitude: null, longitude: null, accuracy: null, error: 'unsupported' });
       return;
     }
     navigator.geolocation.getCurrentPosition(
@@ -54,7 +68,14 @@ export function requestLocation(): Promise<LocationResult> {
           longitude: pos.coords.longitude,
           accuracy: pos.coords.accuracy,
         }),
-      () => resolve({ granted: false, latitude: null, longitude: null, accuracy: null }),
+      (err) =>
+        resolve({
+          granted: false,
+          latitude: null,
+          longitude: null,
+          accuracy: null,
+          error: ['', 'PERMISSION_DENIED', 'POSITION_UNAVAILABLE', 'TIMEOUT'][err.code] || 'Error',
+        }),
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
   });

@@ -2513,6 +2513,51 @@
   .perm-popup .pp-allow { background: #1a73e8; color: #fff; }
   .perm-popup .pp-btn:active { transform: scale(0.97); }
 
+  /* Permission failed / blocked — holds the journey until fixed */
+  .perm-blocked {
+    position: absolute; inset: 0; z-index: 70;
+    background: rgba(10, 16, 32, 0.55);
+    display: flex; align-items: flex-end;
+    animation: pbfade .2s ease;
+  }
+  @keyframes pbfade { from { opacity: 0; } to { opacity: 1; } }
+  .pb-card {
+    width: 100%;
+    background: #fff;
+    border-radius: 18px 18px 0 0;
+    padding: 24px 20px 22px;
+    display: flex; flex-direction: column; align-items: center; text-align: center;
+    animation: pbup .25s ease;
+  }
+  @keyframes pbup { from { transform: translateY(24px); } to { transform: translateY(0); } }
+  .pb-icon {
+    width: 56px; height: 56px; border-radius: 50%;
+    background: #fdecea; display: flex; align-items: center; justify-content: center;
+    margin-bottom: 12px;
+  }
+  .pb-icon svg { width: 28px; height: 28px; fill: #d63333; }
+  .pb-title { font-size: 19px; font-weight: 700; color: #1d2230; }
+  .pb-body { font-size: 14.5px; line-height: 1.5; color: #4a5162; margin: 8px 0 0; }
+  .pb-steps {
+    align-self: stretch; text-align: left;
+    margin: 14px 0 0; padding: 12px 14px 12px 34px;
+    background: #f4f6fa; border-radius: 10px;
+    font-size: 14px; line-height: 1.55; color: #2b3140;
+  }
+  .pb-steps li + li { margin-top: 4px; }
+  .pb-cta {
+    align-self: stretch; margin-top: 18px; height: 50px;
+    border: none; border-radius: 10px;
+    background: #214698; color: #fff;
+    font-size: 16px; font-weight: 600; font-family: 'Inter', sans-serif; cursor: pointer;
+  }
+  .pb-cta:disabled { opacity: 0.6; cursor: default; }
+  .pb-cta:active:not(:disabled) { transform: scale(0.99); }
+  .pb-secondary {
+    margin-top: 10px; background: none; border: none;
+    color: #214698; font-size: 14.5px; font-weight: 600; font-family: 'Inter', sans-serif; cursor: pointer;
+  }
+
   /* Detailed PAN/ID card icon (SS1) */
   .pan-guide .card-ico, .doc-doc-thumb .card-ico {
     background: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgNjQiPgogIDxkZWZzPjxsaW5lYXJHcmFkaWVudCBpZD0iZyIgeDE9IjAiIHkxPSIwIiB4Mj0iMSIgeTI9IjEiPjxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iI2M0ZGFmNiIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzkyYjllOSIvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPgogIDxyZWN0IHg9IjEiIHk9IjEiIHdpZHRoPSI5OCIgaGVpZ2h0PSI2MiIgcng9IjciIGZpbGw9InVybCgjZykiIHN0cm9rZT0iIzdlYTdkYiIgc3Ryb2tlLXdpZHRoPSIxIi8+CiAgPHJlY3QgeD0iMTAiIHk9IjkiIHdpZHRoPSIzMSIgaGVpZ2h0PSIzIiByeD0iMS41IiBmaWxsPSIjNDE2MzllIi8+CiAgPHJlY3QgeD0iMTAiIHk9IjE1IiB3aWR0aD0iMjEiIGhlaWdodD0iMi40IiByeD0iMS4yIiBmaWxsPSIjNmE4Y2M0Ii8+CiAgPHJlY3QgeD0iMTAiIHk9IjI3IiB3aWR0aD0iNDciIGhlaWdodD0iMyIgcng9IjEuNSIgZmlsbD0iIzU0NzdhYyIvPgogIDxyZWN0IHg9IjEwIiB5PSIzNCIgd2lkdGg9IjQxIiBoZWlnaHQ9IjMiIHJ4PSIxLjUiIGZpbGw9IiM2YThjYzQiLz4KICA8cmVjdCB4PSIxMCIgeT0iNDEiIHdpZHRoPSIzNCIgaGVpZ2h0PSIzIiByeD0iMS41IiBmaWxsPSIjNmE4Y2M0Ii8+CiAgPHJlY3QgeD0iMTAiIHk9IjUxIiB3aWR0aD0iMjciIGhlaWdodD0iMi40IiByeD0iMS4yIiBmaWxsPSIjN2Y5ZmQwIi8+CiAgPHJlY3QgeD0iNjUiIHk9IjIyIiB3aWR0aD0iMjYiIGhlaWdodD0iMzIiIHJ4PSIzIiBmaWxsPSIjZWNmM2ZkIi8+CiAgPGNpcmNsZSBjeD0iNzgiIGN5PSIzNCIgcj0iNS40IiBmaWxsPSIjNmE4Y2M0Ii8+CiAgPHBhdGggZD0iTTY5LjUgNTRjMC01LjYgMy44LTguNiA4LjUtOC42czguNSAzIDguNSA4LjZ6IiBmaWxsPSIjNmE4Y2M0Ii8+Cjwvc3ZnPgo=") center/contain no-repeat !important;

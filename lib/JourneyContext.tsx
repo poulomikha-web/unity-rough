@@ -30,6 +30,13 @@ interface PermPopup {
   kind: PermKind | null;
 }
 
+/** A permission step that failed and is holding the journey until fixed. */
+export interface PermBlocked {
+  kind: PermKind;
+  /** 'denied-in-app' (user tapped Deny on our prompt) or a PermError. */
+  reason: string;
+}
+
 interface CameraState {
   stream: MediaStream | null;
   failed: boolean;
@@ -54,6 +61,10 @@ interface JourneyValue {
   startOnboarding: () => void;
   obProceed: () => void;
   permRespond: (allow: boolean) => void;
+  /** Set while a permission failed; the journey waits on that step. */
+  permBlocked: PermBlocked | null;
+  /** "Try again" on the blocked sheet; resolves when the attempt finishes. */
+  permRetry: () => Promise<void>;
 
   // Shared capture artefacts
   selfieUrl: string | null;
@@ -90,6 +101,8 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
 
   const [obIndex, setObIndex] = useState(-1); // -1 => not onboarding
   const [permPopup, setPermPopup] = useState<PermPopup>({ open: false, kind: null });
+  const [permBlocked, setPermBlocked] = useState<PermBlocked | null>(null);
+  const permBusy = useRef(false);
 
   const [selfieUrl, setSelfieUrl] = useState<string | null>(null);
   const [panFrontUrl, setPanFrontUrl] = useState<string | null>(null);
@@ -121,6 +134,7 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
       clearObTimers();
       setObIndex(-1);
       setPermPopup({ open: false, kind: null });
+      setPermBlocked(null);
       setScreen(next);
     },
     [clearObTimers]
@@ -160,52 +174,86 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
   // Perform (allow) or record a denial for one permission. When allowed and the
   // device hasn't granted it yet this triggers the real native prompt; when the
   // device already granted it, the underlying API resolves silently (no prompt).
-  const recordPermission = useCallback(async (kind: PermKind, allow: boolean) => {
-    const results = permResultsRef.current;
-    if (allow) {
-      if (kind === 'camera') {
-        const { granted, stream: s } = await requestCamera();
-        if (s) {
-          streamRef.current = s;
-          setStream(s);
+  const recordPermission = useCallback(
+    async (kind: PermKind, allow: boolean): Promise<{ granted: boolean; error?: string }> => {
+      const results = permResultsRef.current;
+      if (allow) {
+        if (kind === 'camera') {
+          const { granted, stream: s, error } = await requestCamera();
+          if (s) {
+            streamRef.current?.getTracks().forEach((t) => t.stop());
+            streamRef.current = s;
+            setStream(s);
+          }
+          setCamFailed(!granted);
+          results.camera = granted;
+          if (granted) rememberGranted('camera');
+          return { granted, error };
         }
-        setCamFailed(!granted);
-        results.camera = granted;
-        if (granted) rememberGranted('camera');
-      } else if (kind === 'microphone') {
-        const g = (await requestMicrophone()).granted;
-        results.microphone = g;
-        if (g) rememberGranted('microphone');
-      } else if (kind === 'location') {
+        if (kind === 'microphone') {
+          const { granted, error } = await requestMicrophone();
+          results.microphone = granted;
+          if (granted) rememberGranted('microphone');
+          return { granted, error };
+        }
         const r = await requestLocation();
         results.location = r.granted;
         results.latitude = r.latitude;
         results.longitude = r.longitude;
         results.accuracy = r.accuracy;
         if (r.granted) rememberGranted('location');
+        return { granted: r.granted, error: r.error };
       }
-    } else {
+
       if (kind === 'camera') {
         results.camera = false;
         setCamFailed(true);
       } else if (kind === 'microphone') {
         results.microphone = false;
-      } else if (kind === 'location') {
+      } else {
         results.location = false;
       }
-    }
-  }, []);
+      return { granted: false, error: 'denied-in-app' };
+    },
+    []
+  );
+
+  // Request one permission; advance on success, otherwise hold the step on the
+  // "blocked" sheet. Camera, microphone and location are all required for KYC.
+  const attemptPermission = useCallback(
+    async (kind: PermKind, allow: boolean) => {
+      if (permBusy.current) return;
+      permBusy.current = true;
+      try {
+        const { granted, error } = await recordPermission(kind, allow);
+        if (granted) {
+          setPermBlocked(null);
+          advanceOnboard();
+        } else {
+          setPermBlocked({ kind, reason: error || 'Error' });
+        }
+      } finally {
+        permBusy.current = false;
+      }
+    },
+    [recordPermission, advanceOnboard]
+  );
 
   // "Allow" / "Deny" on the in-app prompt.
   const permRespond = useCallback(
     async (allow: boolean) => {
       setPermPopup({ open: false, kind: null });
       const kind = OB_SEQUENCE[obIndex]?.perm;
-      if (kind) await recordPermission(kind, allow);
-      advanceOnboard();
+      if (kind) await attemptPermission(kind, allow);
+      else advanceOnboard();
     },
-    [obIndex, advanceOnboard, recordPermission]
+    [obIndex, advanceOnboard, attemptPermission]
   );
+
+  // "Try again" on the blocked sheet.
+  const permRetry = useCallback(async () => {
+    if (permBlocked) await attemptPermission(permBlocked.kind, true);
+  }, [permBlocked, attemptPermission]);
 
   // Drive the onboarding sequence whenever the index changes.
   useEffect(() => {
@@ -243,8 +291,12 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
         if (cancelled) return;
         const alreadyGranted = state === 'granted' || (state === 'unsupported' && wasGranted(kind));
         if (alreadyGranted) {
-          await recordPermission(kind, true);
-          if (!cancelled) advanceOnboard();
+          // Acquire silently; if that still fails (camera busy, location off…)
+          // the blocked sheet explains why.
+          await attemptPermission(kind, true);
+        } else if (state === 'denied') {
+          // The browser won't show its prompt again — go straight to the fix-it sheet.
+          setPermBlocked({ kind, reason: 'NotAllowedError' });
         } else {
           permTimer.current = setTimeout(() => setPermPopup({ open: true, kind }), 450);
         }
@@ -258,7 +310,7 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
       cancelled = true;
       clearObTimers();
     };
-  }, [obIndex, advanceOnboard, clearObTimers, recordPermission]);
+  }, [obIndex, advanceOnboard, clearObTimers, attemptPermission]);
 
   const restart = useCallback(() => {
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
@@ -273,6 +325,7 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
     sessionIdRef.current = newSessionId();
     setObIndex(-1);
     setPermPopup({ open: false, kind: null });
+    setPermBlocked(null);
     setSelfieUrl(null);
     setPanFrontUrl(null);
     setScreen('redirect');
@@ -293,6 +346,8 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
       startOnboarding,
       obProceed,
       permRespond,
+      permBlocked,
+      permRetry,
       selfieUrl,
       setSelfieUrl,
       panFrontUrl,
@@ -311,6 +366,8 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
       startOnboarding,
       obProceed,
       permRespond,
+      permBlocked,
+      permRetry,
       selfieUrl,
       panFrontUrl,
     ]
