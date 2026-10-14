@@ -8,18 +8,25 @@
 //   3. calls eve /v3/tasks/sync/validate/document with doc_type=ind_pan and
 //      all advanced_features on, and
 //   4. if every advanced feature passed, OCRs the same image with
-//      /v3/tasks/sync/extract/ind_pan, and
-//   5. returns { ok, failed[], pan_details } — ok only when validation passed
-//      and the OCR read a PAN number and name.
+//      /v3/tasks/sync/extract/ind_pan,
+//   5. if the OCR read the card, runs the async
+//      /v3/tasks/async/check_acceptability/document (live_captured) and polls
+//      /v3/tasks?request_id= for its result, and
+//   6. returns { ok, failed[], pan_details } — ok only when all three passed.
+// Every eve call gets its own fresh task_id/group_id.
 //
 // Secrets (set with `supabase secrets set`): IDFY_API_KEY, IDFY_ACCOUNT_ID.
 // SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY are provided by the runtime.
 // Deploy with --no-verify-jwt: the app's sb_publishable key is not a JWT.
 
-import { evaluateAdvancedFeatures, pickPanDetails } from './checks.mjs';
+import { evaluateAcceptability, evaluateAdvancedFeatures, pickPanDetails } from './checks.mjs';
 
 const EVE_URL = 'https://eve.idfy.com/v3/tasks/sync/validate/document';
 const EVE_OCR_URL = 'https://eve.idfy.com/v3/tasks/sync/extract/ind_pan';
+const EVE_ACCEPTABILITY_URL = 'https://eve.idfy.com/v3/tasks/async/check_acceptability/document';
+const EVE_TASKS_URL = 'https://eve.idfy.com/v3/tasks';
+const ACCEPTABILITY_POLL_MS = 1000;
+const ACCEPTABILITY_TIMEOUT_MS = 25_000;
 const BUCKET = 'pan-captures';
 const SIGNED_URL_TTL_S = 600;
 const MAX_IMAGE_BYTES = 6 * 1024 * 1024;
@@ -75,6 +82,38 @@ async function saveResponse(path: string, record: unknown): Promise<void> {
   } catch (err) {
     console.warn('[validate-pan] save response threw', err);
   }
+}
+
+type EveHeaders = Record<string, string>;
+
+/**
+ * Start eve's async check_acceptability task and poll until it finishes.
+ * Returns the final task (status completed/failed), or null on timeout.
+ */
+async function runAcceptability(
+  headers: EveHeaders,
+  documentUrl: string,
+  taskId: string,
+  groupId: string
+): Promise<{ http_status: number; request_id: string | null; task: any }> {
+  const start = await fetch(EVE_ACCEPTABILITY_URL, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ task_id: taskId, group_id: groupId, data: { document1: documentUrl, live_captured: true } }),
+  });
+  const started = await start.json().catch(() => ({}));
+  const requestId: string | null = started.request_id ?? null;
+  if (!start.ok || !requestId) return { http_status: start.status, request_id: requestId, task: started };
+
+  const deadline = Date.now() + ACCEPTABILITY_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, ACCEPTABILITY_POLL_MS));
+    const res = await fetch(`${EVE_TASKS_URL}?request_id=${encodeURIComponent(requestId)}`, { headers });
+    const tasks = await res.json().catch(() => null);
+    const task = Array.isArray(tasks) ? tasks[0] : null;
+    if (task && task.status !== 'in_progress') return { http_status: res.status, request_id: requestId, task };
+  }
+  return { http_status: 0, request_id: requestId, task: null };
 }
 
 /** Upload the image and return a signed URL eve can fetch. */
@@ -147,7 +186,7 @@ Deno.serve(async (req) => {
   try {
     const documentUrl = await storeAndSign(img.bytes, img.contentType, `${sessionId}/${taskId}.${ext}`);
 
-    const eveHeaders = { 'Content-Type': 'application/json', 'api-key': IDFY_API_KEY, 'account-id': IDFY_ACCOUNT_ID };
+    const eveHeaders: EveHeaders = { 'Content-Type': 'application/json', 'api-key': IDFY_API_KEY, 'account-id': IDFY_ACCOUNT_ID };
     const eve = await fetch(EVE_URL, {
       method: 'POST',
       headers: eveHeaders,
@@ -178,6 +217,16 @@ Deno.serve(async (req) => {
     }
     const details = ocr ? pickPanDetails(ocr.response) : null;
 
+    // OCR read the card -> check the capture is acceptable (async task).
+    let acceptability: { task_id: string; group_id: string; http_status: number; request_id: string | null; response: any } | null = null;
+    if (details) {
+      const accTaskId = crypto.randomUUID();
+      const accGroupId = crypto.randomUUID();
+      const run = await runAcceptability(eveHeaders, documentUrl, accTaskId, accGroupId);
+      acceptability = { task_id: accTaskId, group_id: accGroupId, http_status: run.http_status, request_id: run.request_id, response: run.task };
+    }
+    const accVerdict = acceptability?.response?.status === 'completed' ? evaluateAcceptability(acceptability.response.result) : null;
+
     await saveResponse(`${sessionId}/${taskId}.json`, {
       at: new Date().toISOString(),
       request: { task_id: taskId, group_id: groupId, doc_type: 'ind_pan' },
@@ -185,9 +234,18 @@ Deno.serve(async (req) => {
       verdict,
       response: out,
       ocr,
+      acceptability: acceptability && { ...acceptability, verdict: accVerdict },
     });
 
-    const ids = { task_id: taskId, group_id: groupId, request_id: out.request_id, ocr_task_id: ocr?.task_id, ocr_group_id: ocr?.group_id };
+    const ids = {
+      task_id: taskId,
+      group_id: groupId,
+      request_id: out.request_id,
+      ocr_task_id: ocr?.task_id,
+      ocr_group_id: ocr?.group_id,
+      acceptability_task_id: acceptability?.task_id,
+      acceptability_group_id: acceptability?.group_id,
+    };
 
     if (!verdict) {
       // e.g. 422 INVALID_IMAGE (too small / unreadable) — the customer retakes.
@@ -206,6 +264,19 @@ Deno.serve(async (req) => {
         result: out.result,
       });
     }
+    if (!accVerdict) {
+      // Task failed to start, failed on eve's side, or didn't finish in time.
+      console.warn('[validate-pan] acceptability error', JSON.stringify(acceptability));
+      const timedOut = acceptability?.http_status === 0;
+      return reply(200, {
+        ok: false,
+        failed: [],
+        error: timedOut ? 'ACCEPTABILITY_TIMEOUT' : 'ACCEPTABILITY_FAILED',
+        message: acceptability?.response?.message ?? null,
+        ...ids,
+      });
+    }
+    if (!accVerdict.ok) return reply(200, { ...accVerdict, ...ids, acceptability: acceptability?.response?.result });
     return reply(200, { ok: true, failed: [], ...ids, result: out.result, pan_details: details });
   } catch (err) {
     console.error('[validate-pan]', err);

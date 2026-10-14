@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { evaluateAdvancedFeatures, pickPanDetails } from './checks.mjs';
+import { evaluateAcceptability, evaluateAdvancedFeatures, pickPanDetails } from './checks.mjs';
 
 // Real `result` returned by eve validate/document for a good PAN front.
 const GOOD = {
@@ -72,4 +72,44 @@ test('OCR without a PAN number or name is not a success', () => {
   assert.equal(pickPanDetails(out({ name_on_card: '  ' })), null);
   assert.equal(pickPanDetails({ status: 'failed' }), null);
   assert.equal(pickPanDetails(undefined), null);
+});
+
+// Real `result` from eve's async check_acceptability/document for a good PAN.
+const ACCEPTABLE = {
+  details: {
+    card_hindrance: ['false'],
+    flash_on_card: ['false'],
+    is_laminated: ['false'],
+    is_live: ['true'],
+    is_photocopy: ['false'],
+    optimal_dimensions: ['true'],
+  },
+};
+const withDetail = (d) => ({ details: { ...ACCEPTABLE.details, ...d } });
+
+test('a clean live capture is acceptable', () => {
+  assert.deepEqual(evaluateAcceptability(ACCEPTABLE), { ok: true, failed: [] });
+});
+
+test('each bad acceptability flag is reported', () => {
+  assert.deepEqual(evaluateAcceptability(withDetail({ card_hindrance: ['true'] })).failed, ['card_hindrance']);
+  assert.deepEqual(evaluateAcceptability(withDetail({ flash_on_card: ['true'] })).failed, ['flash_on_card']);
+  assert.deepEqual(evaluateAcceptability(withDetail({ is_photocopy: ['true'] })).failed, ['is_photocopy']);
+  assert.deepEqual(evaluateAcceptability(withDetail({ is_live: ['false'] })).failed, ['is_live']);
+  assert.deepEqual(evaluateAcceptability(withDetail({ optimal_dimensions: ['false'] })).failed, ['optimal_dimensions']);
+});
+
+test('a laminated card is still acceptable', () => {
+  assert.equal(evaluateAcceptability(withDetail({ is_laminated: ['true'] })).ok, true);
+});
+
+test('missing acceptability details fail every check, booleans also accepted', () => {
+  assert.deepEqual(evaluateAcceptability({}).failed, [
+    'card_hindrance',
+    'flash_on_card',
+    'is_photocopy',
+    'is_live',
+    'optimal_dimensions',
+  ]);
+  assert.equal(evaluateAcceptability({ details: { card_hindrance: false, flash_on_card: [false], is_photocopy: 'false', is_live: true, optimal_dimensions: ['true'] } }).ok, true);
 });

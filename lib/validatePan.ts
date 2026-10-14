@@ -3,7 +3,17 @@
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-export type PanFeature = 'face_details' | 'detect_doc_side' | 'check_scan';
+export type PanFeature =
+  // validate/document advanced_features
+  | 'face_details'
+  | 'detect_doc_side'
+  | 'check_scan'
+  // check_acceptability/document
+  | 'card_hindrance'
+  | 'flash_on_card'
+  | 'is_photocopy'
+  | 'is_live'
+  | 'optimal_dimensions';
 
 /** PAN details read by eve OCR (extract/ind_pan). */
 export interface PanDetails {
@@ -16,7 +26,7 @@ export interface PanDetails {
 
 export interface PanValidation {
   ok: boolean;
-  /** Advanced features that came back false (empty when eve itself errored). */
+  /** Checks that failed (empty when eve itself errored). */
   failed: PanFeature[];
   /** eve / transport error code, e.g. INVALID_IMAGE, NETWORK. */
   error?: string;
@@ -30,6 +40,11 @@ export const PAN_FEATURE_MESSAGES: Record<PanFeature, string> = {
   face_details: 'Your photo on the PAN card is not clearly visible.',
   detect_doc_side: 'Please capture the front side of your PAN card.',
   check_scan: 'Please capture the original PAN card, not a scan or photocopy.',
+  card_hindrance: 'Make sure nothing, like your fingers, is covering the card.',
+  flash_on_card: 'Avoid glare or flash on the card.',
+  is_photocopy: 'Please capture the original PAN card, not a photocopy.',
+  is_live: 'Please capture the physical card, not a photo of it on a screen or paper.',
+  optimal_dimensions: 'Hold the card closer so it fills the frame.',
 };
 
 /**

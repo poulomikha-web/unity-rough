@@ -52,3 +52,42 @@ export function pickPanDetails(out) {
   };
   return details.name && details.pan_number ? details : null;
 }
+
+/**
+ * @typedef {'card_hindrance' | 'flash_on_card' | 'is_photocopy' | 'is_live' |
+ *   'optimal_dimensions'} AcceptabilityCheck
+ */
+
+/** Each checked flag and the value it must have to pass. is_laminated is informational. */
+const ACCEPTABLE_WHEN = /** @type {const} */ ([
+  ['card_hindrance', false],
+  ['flash_on_card', false],
+  ['is_photocopy', false],
+  ['is_live', true],
+  ['optimal_dimensions', true],
+]);
+
+/** eve returns flags as ["true"]; also tolerate bare strings/booleans. */
+function flag(v) {
+  const x = Array.isArray(v) ? v[0] : v;
+  if (x === true || x === 'true') return true;
+  if (x === false || x === 'false') return false;
+  return undefined;
+}
+
+/**
+ * Decide whether the capture is acceptable, from the `result` of eve's async
+ * check_acceptability/document task. A missing flag counts as a failure.
+ *
+ * @param {any} result
+ * @returns {{ ok: boolean, failed: AcceptabilityCheck[] }}
+ */
+export function evaluateAcceptability(result) {
+  const d = result?.details ?? {};
+  /** @type {AcceptabilityCheck[]} */
+  const failed = [];
+  for (const [key, want] of ACCEPTABLE_WHEN) {
+    if (flag(d[key]) !== want) failed.push(key);
+  }
+  return { ok: failed.length === 0, failed };
+}
